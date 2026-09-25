@@ -126,6 +126,25 @@ export function linearCounts(items: RetrievedItem[]): string | null {
   return lines.join("\n");
 }
 
+/** Merged/open PR totals per repo within the plan window, so Grok never counts PRs itself. */
+export function githubCounts(items: RetrievedItem[], sinceDays: number, nowMs: number): string | null {
+  const pulls = dedupe(items.filter((item) => item.citation.kind === "github_pr"));
+  if (!pulls.length) return null;
+  const cutoff = nowMs - sinceDays * 86_400_000;
+  const byRepo = new Map<string, { merged: string[]; open: string[] }>();
+  for (const pull of pulls) {
+    const [repo, number] = pull.citation.id.replace(/^github:PR:/, "").split("#");
+    const entry = byRepo.get(repo) ?? { merged: [], open: [] };
+    if (pull.citation.status === "merged" && Date.parse(pull.updatedAt ?? "") >= cutoff) entry.merged.push(`#${number}`);
+    if (pull.citation.status === "open") entry.open.push(`#${number}`);
+    byRepo.set(repo, entry);
+  }
+  const lines = [...byRepo].map(
+    ([repo, { merged, open }]) => `- ${repo}: merged in last ${sinceDays} days ${merged.length} (${merged.join(", ") || "none"}); open PRs retrieved ${open.length} (${open.join(", ") || "none"})`,
+  );
+  return [`PR COUNTS (computed by the server; use these for any PR numbers):`, ...lines].join("\n");
+}
+
 async function runConnector(
   connector: ConnectorId,
   live: (() => Promise<RetrievedItem[]>) | null,
@@ -173,7 +192,8 @@ export async function runRetrieval(plan: RetrievalPlan, config: Config, deps: Re
     plan,
     now(),
   );
-  const counts = linearCounts(results.flatMap((r) => r.items));
+  const allItems = results.flatMap((r) => r.items);
+  const counts = [linearCounts(allItems), githubCounts(allItems, plan.sinceDays, now())].filter(Boolean).join("\n\n") || null;
   const packed = packContext(ranked, CONTEXT_CHAR_BUDGET - (counts ? counts.length + 2 : 0));
 
   return {

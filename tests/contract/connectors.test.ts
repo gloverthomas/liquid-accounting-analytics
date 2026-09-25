@@ -186,3 +186,19 @@ describe("linearCounts", () => {
     expect(linearCounts([])).toBeNull();
   });
 });
+
+describe("githubCounts", () => {
+  it("counts merged PRs per repo inside the window and lists open ones", async () => {
+    const { githubCounts } = await import("../../server/retrieval/index.js");
+    const items = [
+      normalizePull(REPORTING, pull(10, "a", "2026-09-25T00:00:00Z")),
+      normalizePull(REPORTING, pull(9, "b", "2026-09-24T00:00:00Z")),
+      normalizePull(REPORTING, pull(10, "a", "2026-09-25T00:00:00Z")),
+      normalizePull(REPORTING, pull(1, "old", "2026-08-01T00:00:00Z")),
+      normalizePull(REPORTING, pull(4, "wip", null)),
+    ];
+    const text = githubCounts(items, 7, NOW)!;
+    expect(text).toContain(`${REPORTING}: merged in last 7 days 2 (#10, #9); open PRs retrieved 1 (#4)`);
+    expect(githubCounts([], 7, NOW)).toBeNull();
+  });
+});

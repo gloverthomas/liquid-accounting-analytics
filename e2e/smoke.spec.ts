@@ -4,7 +4,7 @@ test("hero loads with suggested prompts", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1 })).toContainText("What do you want");
   await expect(page.getByRole("button", { name: /Open LIQ-24 status/ })).toBeVisible();
-  await expect(page.getByRole("button", { name: /Switch organisation/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Switch organisation/ })).toHaveCount(0);
 });
 
 test("LIQ-24 pill → cited answer", async ({ page }) => {

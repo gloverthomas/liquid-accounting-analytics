@@ -5,7 +5,6 @@ import { AccessGate } from "./components/AccessGate";
 import { ChatThread } from "./components/ChatThread";
 import { Composer } from "./components/Composer";
 import { InsightsHero } from "./components/InsightsHero";
-import { OrgSwitcher } from "./components/OrgSwitcher";
 import { useInsightsChat } from "./hooks/useInsightsChat";
 import { api, ApiRequestError } from "./lib/api";
 
@@ -57,9 +56,10 @@ function FullPageMessage({ title, body, onRetry }: { title: string; body: string
 }
 
 function Workspace({ orgs, prompts }: { orgs: Organisation[]; prompts: SuggestedPrompt[] }) {
-  const [orgId, setOrgId] = useState(orgs[0]?.id ?? "");
+  // Single-org MVP: scope chat to the default org (switcher removed from the UI).
+  const orgId = orgs[0]?.id;
   const [draft, setDraft] = useState("");
-  const chat = useInsightsChat(orgId || undefined);
+  const chat = useInsightsChat(orgId);
   const inThread = chat.entries.length > 0;
 
   const ask = (query: string) => {
@@ -67,11 +67,6 @@ function Workspace({ orgs, prompts }: { orgs: Organisation[]; prompts: Suggested
     void chat.send(query);
   };
 
-  const changeOrg = (id: string) => {
-    if (id === orgId) return;
-    setOrgId(id);
-    chat.reset(); // connector scope changed; old answers no longer apply
-  };
 
   return (
     <div className="shell" data-mode={inThread ? "thread" : "hero"}>
@@ -82,7 +77,6 @@ function Workspace({ orgs, prompts }: { orgs: Organisation[]; prompts: Suggested
             Liquid <span>Insights</span>
           </span>
         </a>
-        <OrgSwitcher orgs={orgs} selectedId={orgId} onSelect={changeOrg} />
       </header>
 
       <main className="main">

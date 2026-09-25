@@ -34,7 +34,7 @@ describe("App", () => {
     render(<App />);
 
     expect(await screen.findByRole("heading", { name: /What do you want to know/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Liquid Coffee Co\./ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Switch organisation/ })).toBeNull();
 
     await userEvent.click(screen.getByRole("button", { name: /Open LIQ-24 status/ }));
 
@@ -64,19 +64,6 @@ describe("App", () => {
     expect(await screen.findByRole("heading", { name: /What do you want to know/ })).toBeInTheDocument();
   });
 
-  it("opens the org switcher and closes on Escape", async () => {
-    route({ "/api/v1/orgs": () => jsonRes(ORGS), "/api/v1/suggested-prompts": () => jsonRes(PROMPTS) });
-    render(<App />);
-    const trigger = await screen.findByRole("button", { name: /Switch organisation/ });
-    await userEvent.click(trigger);
-    expect(trigger).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByRole("list", { name: "Organisations" })).toBeInTheDocument();
-    await userEvent.keyboard("{Escape}");
-    expect(trigger).toHaveAttribute("aria-expanded", "false");
-    await userEvent.click(trigger);
-    await userEvent.click(screen.getAllByRole("button", { name: /Liquid Coffee Co\./ })[1]);
-    expect(trigger).toHaveAttribute("aria-expanded", "false");
-  });
 
   it("shows the access gate on 401 and unlocks with the right code", async () => {
     let unlocked = false;
