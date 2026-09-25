@@ -185,7 +185,7 @@ a { color: inherit; }
 .pills-label { width: 100%; margin-bottom: var(--space-1); font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-faint); }
 
 /* ─── Thread mode ──────────────────────────────────────── */
-.thread { width: 100%; max-width: var(--thread-width); margin: 0 auto; padding: var(--space-6) 0 40vh; display: flex; flex-direction: column; gap: var(--space-6); }
+.thread { width: 100%; max-width: var(--thread-width); margin: 0 auto; padding: var(--space-6) 0 var(--space-6); display: flex; flex-direction: column; gap: var(--space-6); }
 
 .turn-user {
   align-self: flex-end; max-width: 85%; margin: 0; scroll-margin-top: 88px;
