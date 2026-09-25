@@ -195,13 +195,9 @@ a { color: inherit; }
   animation: reveal 420ms var(--ease-out-expo) both;
 }
 
-.answer {
-  position: relative; background: var(--color-surface); border: 1px solid var(--color-rule);
-  border-radius: var(--radius-md); box-shadow: var(--shadow-card);
-  padding: var(--space-5) var(--space-5) var(--space-4) calc(var(--space-5) + 4px);
-  animation: reveal 520ms var(--ease-out-expo) both;
-}
-.answer::before { content: ""; position: absolute; left: 0; top: 18px; bottom: 18px; width: 3px; border-radius: 0 3px 3px 0; background: var(--color-accent); }
+/* Answers sit directly on the page (only the question gets a bubble), like Claude. */
+.answer { position: relative; animation: reveal 520ms var(--ease-out-expo) both; }
+.answer-mark { width: 20px; height: 20px; display: block; }
 .answer-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-bottom: var(--space-3); font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-muted); }
 .badge { display: inline-flex; align-items: center; gap: 6px; border-radius: var(--radius-pill); padding: 2px 8px; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; }
 .badge-live { background: var(--status-good-wash); color: var(--status-good); }
@@ -214,7 +210,7 @@ a { color: inherit; }
 .md ul, .md ol { margin: 0 0 var(--space-3); padding-left: 1.2rem; }
 .md li { margin: 0 0 6px; padding-left: 2px; }
 .md li::marker { color: var(--color-accent); }
-.md code { font-family: var(--font-mono); font-size: 0.86em; background: var(--color-paper); border: 1px solid var(--color-rule); border-radius: 4px; padding: 0 4px; }
+.md code { font-family: var(--font-mono); font-size: 0.86em; background: var(--color-surface); border: 1px solid var(--color-rule); border-radius: 4px; padding: 0 4px; }
 .md em { color: var(--color-muted); }
 .md a { text-decoration-color: var(--color-rule-strong); text-underline-offset: 3px; }
 .cite {
@@ -231,11 +227,11 @@ a { color: inherit; }
 .source-list { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
 .source {
   display: inline-flex; align-items: center; gap: var(--space-2); max-width: 100%;
-  border: 1px solid var(--color-rule); border-radius: var(--radius-sm); background: var(--color-paper);
+  border: 1px solid var(--color-rule); border-radius: var(--radius-sm); background: var(--color-surface);
   padding: 5px 10px 5px 6px; font-size: var(--text-sm); text-decoration: none; color: var(--color-text);
   transition: border-color var(--duration-fast) ease, transform var(--duration-fast) var(--ease-out-expo), background var(--duration-fast) ease;
 }
-.source:hover { border-color: var(--color-ink); background: var(--color-surface); transform: translateY(-1px); }
+.source:hover { border-color: var(--color-ink); transform: translateY(-1px); }
 .source:target, .source[data-flash="true"] { border-color: var(--color-accent); }
 .source-num { display: grid; place-items: center; width: 18px; height: 18px; border-radius: 4px; background: var(--color-ink); color: #fff; font-family: var(--font-mono); font-size: 10px; }
 .source-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 34ch; }
@@ -253,7 +249,7 @@ a { color: inherit; }
 .how summary::-webkit-details-marker { display: none; }
 .how summary svg { transition: transform var(--duration-fast) ease; }
 .how[open] summary svg { transform: rotate(90deg); }
-.how dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px var(--space-4); margin: var(--space-3) 0 0; padding: var(--space-3); background: var(--color-paper); border-radius: var(--radius-sm); }
+.how dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px var(--space-4); margin: var(--space-3) 0 0; padding: var(--space-3); background: var(--color-surface); border: 1px solid var(--color-rule); border-radius: var(--radius-sm); }
 .how dt { color: var(--color-muted); }
 .how dd { margin: 0; font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-ink); align-self: center; }
 
@@ -316,7 +312,6 @@ a { color: inherit; }
   .composer { padding-left: var(--space-4); }
   .ask-label { display: none; }
   .ask-button { width: 44px; padding: 0; justify-content: center; }
-  .answer { padding: var(--space-4) var(--space-4) var(--space-3) calc(var(--space-4) + 4px); }
   .source-title { max-width: 22ch; }
 }
 

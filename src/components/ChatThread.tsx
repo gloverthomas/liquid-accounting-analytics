@@ -34,6 +34,7 @@ function AssistantCard({ entryId, response, onAsk, disabled }: { entryId: string
   return (
     <article className="answer" aria-label="Liquid Insights answer">
       <header className="answer-head">
+        <img className="answer-mark" src="/brand/liquid-mark.png" alt="" width={20} height={20} />
         <span>Liquid Insights</span>
         {sourceBadge(response)}
       </header>
