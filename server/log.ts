@@ -22,6 +22,9 @@ const ALLOWED_FIELDS = new Set([
   "host",
   "port",
   "mode",
+  "origin",
+  "forwardedHost",
+  "fetchSite",
 ]);
 
 const MAX_ERROR_CHARS = 80;

@@ -39,9 +39,11 @@ function originAllowed(request: Request, config: Config): boolean {
   const origin = request.headers.get("origin");
   if (!origin) return true;
   if (config.allowedOrigins.includes(origin)) return true;
-  // Same-origin requests on hosted deploys (incl. Vercel preview URLs).
-  const host = request.headers.get("host");
-  return Boolean(host) && (origin === `https://${host}` || (!config.isProductionLike && origin === `http://${host}`));
+  // Browser-set and unforgeable by page scripts: the definitive same-origin signal.
+  if (request.headers.get("sec-fetch-site") === "same-origin") return true;
+  // Fallback for clients without Fetch Metadata: compare against the public host(s).
+  const hosts = [request.headers.get("x-forwarded-host"), request.headers.get("host")].filter((h): h is string => Boolean(h));
+  return hosts.some((host) => origin === `https://${host}` || (!config.isProductionLike && origin === `http://${host}`));
 }
 
 function connectorFlags(config: Config) {
@@ -144,7 +146,17 @@ export function createApp(deps: AppDeps): AppHandler {
   }
 
   return async function handle(request, ctx) {
-    if (!originAllowed(request, config)) return errorResponse(403, ctx.requestId, "origin_not_allowed");
+    if (!originAllowed(request, config)) {
+      logEvent("origin_rejected", {
+        requestId: ctx.requestId,
+        route: ctx.path,
+        origin: request.headers.get("origin"),
+        host: request.headers.get("host"),
+        forwardedHost: request.headers.get("x-forwarded-host"),
+        fetchSite: request.headers.get("sec-fetch-site"),
+      });
+      return errorResponse(403, ctx.requestId, "origin_not_allowed");
+    }
     if (request.method === "OPTIONS") return noContent(ctx.requestId);
     if (!limiter.allow(RATE_LIMITS.general, ctx.ip)) return errorResponse(429, ctx.requestId, "rate_limit_exceeded");
 

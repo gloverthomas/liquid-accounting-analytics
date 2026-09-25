@@ -48,6 +48,21 @@ describe("BFF routes", () => {
     expect(foreign.status).toBe(403);
     const ok = await app(get("/api/v1/orgs", { Authorization: `Bearer ${DEMO_TOKEN}`, Origin: "http://localhost:5173" }), ctx("/api/v1/orgs"));
     expect(ok.status).toBe(200);
+    const fetchMeta = await app(
+      get("/api/v1/orgs", { Authorization: `Bearer ${DEMO_TOKEN}`, Origin: "https://insights.example", "Sec-Fetch-Site": "same-origin" }),
+      ctx("/api/v1/orgs"),
+    );
+    expect(fetchMeta.status).toBe(200);
+    const forwarded = await app(
+      get("/api/v1/orgs", { Authorization: `Bearer ${DEMO_TOKEN}`, Origin: "https://insights.example", "X-Forwarded-Host": "insights.example" }),
+      ctx("/api/v1/orgs"),
+    );
+    expect(forwarded.status).toBe(200);
+    const crossSite = await app(
+      get("/api/v1/orgs", { Authorization: `Bearer ${DEMO_TOKEN}`, Origin: "https://evil.test", "Sec-Fetch-Site": "cross-site" }),
+      ctx("/api/v1/orgs"),
+    );
+    expect(crossSite.status).toBe(403);
     const preflight = await app(new Request("http://localhost:5173/api/v1/orgs", { method: "OPTIONS" }), ctx("/api/v1/orgs"));
     expect(preflight.status).toBe(204);
   });

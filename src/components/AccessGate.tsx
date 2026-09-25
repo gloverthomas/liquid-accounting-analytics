@@ -21,7 +21,15 @@ export function AccessGate({ onUnlocked }: AccessGateProps) {
       onUnlocked();
     } catch (err) {
       const status = err instanceof ApiRequestError ? err.status : 0;
-      setError(status === 401 ? "That access code isn't right." : status === 429 ? "Too many attempts. Wait a minute." : "Couldn't sign in. Try again.");
+      setError(
+        status === 401
+          ? "That access code isn't right."
+          : status === 429
+            ? "Too many attempts. Wait a minute."
+            : status === 403
+              ? "This browser request was blocked as cross-site. Open the site directly at its address and try again."
+              : "Couldn't sign in. Try again.",
+      );
     } finally {
       setBusy(false);
     }
