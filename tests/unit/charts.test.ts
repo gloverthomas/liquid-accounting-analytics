@@ -68,7 +68,9 @@ describe("chart builders", () => {
     const all = openedVsClosed(activity, 7, NOW, TZ, false, false)!;
     expect(all.categories).toHaveLength(4);
     expect(all.series.map((s) => s.values.reduce((a, v) => a + v, 0))).toEqual([2, 1]);
+    expect(describeChart(all)).toContain("COMPARISON (use this; do not recompute): Opened 2 is MORE than Closed 1, difference 1.");
     const bugs = openedVsClosed(activity, 7, NOW, TZ, true, false)!;
+    expect(describeChart(bugs)).toContain("Opened 1 is EQUAL to Closed 1");
     expect(bugs.title).toMatch(/^Bugs/);
     expect(bugs.series.map((s) => s.values.reduce((a, v) => a + v, 0))).toEqual([1, 1]);
   });

@@ -196,9 +196,17 @@ export function buildCharts(plan: RetrievalPlan, inputs: ChartInputs, nowMs: num
   return charts.filter((c): c is ChartSpec => c !== null);
 }
 
+/** States two-series comparisons outright, so the model never has to (it got "6 vs 4" backwards). */
+function compareLine(chart: ChartSpec): string {
+  if (chart.series.length !== 2) return "";
+  const [a, b] = chart.series.map((s) => ({ name: s.name, total: s.values.reduce((sum, v) => sum + v, 0) }));
+  const relation = a.total > b.total ? "MORE than" : a.total < b.total ? "LESS than" : "EQUAL to";
+  return ` COMPARISON (use this; do not recompute): ${a.name} ${a.total} is ${relation} ${b.name} ${b.total}, difference ${Math.abs(a.total - b.total)}.`;
+}
+
 /** Compact text version for Grok, so the prose matches the chart exactly. */
 export function describeChart(chart: ChartSpec): string {
   const totals = chart.series.map((s) => `${s.name} ${s.values.reduce((a, v) => a + v, 0)}`).join(", ");
   const rows = chart.categories.map((c, i) => `${c}: ${chart.series.map((s) => `${s.name}=${s.values[i]}`).join(" ")}`).join("; ");
-  return `CHART "${chart.title}" (${chart.subtitle}${chart.sample ? "; SAMPLE DATA" : ""}). Totals: ${totals}. By ${chart.categories.length > 0 ? "column" : "-"}: ${rows}`;
+  return `CHART "${chart.title}" (${chart.subtitle}${chart.sample ? "; SAMPLE DATA" : ""}). Totals: ${totals}.${compareLine(chart)} By column: ${rows}`;
 }
