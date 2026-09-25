@@ -113,11 +113,22 @@ function tally(values: string[]): string {
  * Deterministic counts over every Linear issue retrieved (before the context
  * budget trims anything) — the model reads numbers here instead of counting.
  */
-export function linearCounts(items: RetrievedItem[]): string | null {
+export function linearCounts(items: RetrievedItem[], sinceDays?: number, nowMs = Date.now()): string | null {
   const issues = dedupe(items.filter((item) => item.citation.kind === "linear_issue"));
   if (!issues.length) return null;
   const lines = [`COUNTS (computed by the server over the ${issues.length} most recently updated Linear issues; use these for any numbers):`];
   lines.push(`- All issues by state: ${tally(issues.map((i) => i.citation.status ?? "Unknown"))}`);
+  const isClosed = (i: RetrievedItem) => /^(done|canceled|cancelled|duplicate)$/i.test(i.citation.status ?? "");
+  const idList = (list: RetrievedItem[]) => list.map((i) => i.mentions[0]).join(", ") || "none";
+  const open = issues.filter((i) => !isClosed(i));
+  lines.push(`- Open now (not Done/Canceled): ${open.length} (${idList(open)})`);
+  if (sinceDays) {
+    const recent = issues.filter((i) => i.updatedAt && nowMs - Date.parse(i.updatedAt) <= sinceDays * 86_400_000);
+    const resolved = recent.filter((i) => /^done$/i.test(i.citation.status ?? ""));
+    lines.push(`- Moved to Done and last updated in the last ${sinceDays} days: ${resolved.length} (${idList(resolved)})`);
+    const ids = recent.map((i) => i.mentions[0]).join(", ") || "none";
+    lines.push(`- Updated in the last ${sinceDays} days: ${recent.length} (${recent.length ? tally(recent.map((i) => i.citation.status ?? "Unknown")) + "; " : ""}${ids})`);
+  }
   const labels = [...new Set(issues.flatMap((i) => i.labels ?? []))].sort();
   for (const label of labels) {
     const tagged = issues.filter((i) => i.labels?.includes(label));
@@ -193,7 +204,7 @@ export async function runRetrieval(plan: RetrievalPlan, config: Config, deps: Re
     now(),
   );
   const allItems = results.flatMap((r) => r.items);
-  const counts = [linearCounts(allItems), githubCounts(allItems, plan.sinceDays, now())].filter(Boolean).join("\n\n") || null;
+  const counts = [linearCounts(allItems, plan.sinceDays, now()), githubCounts(allItems, plan.sinceDays, now())].filter(Boolean).join("\n\n") || null;
   const packed = packContext(ranked, CONTEXT_CHAR_BUDGET - (counts ? counts.length + 2 : 0));
 
   return {

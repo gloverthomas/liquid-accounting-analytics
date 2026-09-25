@@ -16,14 +16,30 @@ const INTENT_BOOST: Record<Intent, Partial<Record<Kind, number>>> = {
   merged_prs: { github_pr: 40 },
   linear_overview: { linear_issue: 40 },
   trend: { posthog_insight: 40, github_pr: 15, linear_issue: 10 },
+  problems: { linear_issue: 20, github_check: 10, github_pr: 5 },
   general: {},
 };
+
+const FAILED_CHECK = new Set(["failure", "cancelled", "timed_out", "action_required", "startup_failure"]);
+const FIX_TITLE = /\b(fix|fixes|fixed|hotfix|revert|regression|broken|bug)\b/i;
+
+/** For "what went wrong" questions: bugs, failed checks and fix PRs inside the window rise; stale items sink. */
+function problemSignal(item: RetrievedItem, plan: RetrievalPlan, nowMs: number): number {
+  let signal = 0;
+  if (item.labels?.some((l) => /bug|incident|regression/i.test(l))) signal += 25;
+  if (item.citation.kind === "github_check" && FAILED_CHECK.has(item.citation.status ?? "")) signal += 50;
+  if (item.citation.kind === "github_pr" && FIX_TITLE.test(item.citation.title)) signal += 15;
+  const inWindow = item.updatedAt ? nowMs - Date.parse(item.updatedAt) <= plan.sinceDays * 86_400_000 : false;
+  return inWindow ? signal : signal - 25;
+}
 
 function score(item: RetrievedItem, plan: RetrievalPlan, nowMs: number): number {
   let total = 0;
   if (item.mentions.some((id) => plan.issueIds.includes(id))) total += 100;
   total += INTENT_BOOST[plan.intent][item.citation.kind] ?? 0;
   if (plan.intent === "merged_prs" && item.citation.status !== "merged") total -= 20;
+
+  if (plan.intent === "problems") total += problemSignal(item, plan, nowMs);
 
   if (plan.linearStates.length && item.citation.kind === "linear_issue") {
     total += plan.linearStates.includes(item.citation.status ?? "") ? 30 : -30;

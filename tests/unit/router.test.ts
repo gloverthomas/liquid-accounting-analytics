@@ -48,4 +48,23 @@ describe("planRetrieval", () => {
     expect(general.sinceDays).toBe(14);
     expect(general.keywords).toContain("useful");
   });
+
+  it("treats 'what issues have we had' as a problems overview, not a ticket list", () => {
+    const plan = planRetrieval("What issues have we had from our code base this week?", REPOS);
+    expect(plan.intent).toBe("problems");
+    expect(plan.style).toBe("overview");
+    expect(plan.sinceDays).toBe(7);
+    expect(plan.wantsChecks).toBe(true);
+    expect(plan.keywords).not.toContain("issues");
+  });
+
+  it("chooses overview style for summaries and direct style for specific questions", () => {
+    expect(planRetrieval("Give me an overview of what's been happening", REPOS).style).toBe("overview");
+    expect(planRetrieval("Catch me up on Reporting", REPOS).style).toBe("overview");
+    expect(planRetrieval("Is assistant-unit passing on Core main?", REPOS).style).toBe("direct");
+    expect(planRetrieval("What's the status of LIQ-24?", REPOS).style).toBe("direct");
+    expect(planRetrieval("What went wrong with the build?", REPOS).intent).toBe("ci_health");
+    expect(planRetrieval("Any regressions or broken deep links?", REPOS).intent).toBe("problems");
+  });
 });
+

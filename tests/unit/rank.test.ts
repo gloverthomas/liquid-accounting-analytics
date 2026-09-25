@@ -74,3 +74,21 @@ describe("packContext", () => {
     expect(packed.truncated).toBe(false);
   });
 });
+
+describe("problems ranking", () => {
+  it("lifts bugs, failed checks and fix PRs inside the window; sinks stale items", () => {
+    const plan = planRetrieval("What issues have we had this week?", ["o/core"]);
+    const bug = item("linear:LIQ-2", "linear_issue", "bug", { labels: ["Bug"], updatedAt: "2026-09-23T00:00:00Z" });
+    const failed = item("github:check:o/core@a:build", "github_check", "check", { updatedAt: "2026-09-24T00:00:00Z" });
+    failed.citation.status = "failure";
+    const fix = item("github:PR:o/core#3", "github_pr", "pr", { updatedAt: "2026-09-24T00:00:00Z" });
+    fix.citation.title = "fix: broken deep link";
+    const stale = item("linear:LIQ-1", "linear_issue", "old", { labels: ["Bug"], updatedAt: "2026-08-01T00:00:00Z" });
+    const plain = item("linear:LIQ-5", "linear_issue", "chore", { updatedAt: "2026-09-24T00:00:00Z" });
+    const ranked = rankItems([plain, stale, fix, bug, failed], plan, NOW).map((i) => i.citation.id);
+    expect(ranked[0]).toBe("github:check:o/core@a:build");
+    expect(ranked.indexOf("linear:LIQ-2")).toBeLessThan(ranked.indexOf("linear:LIQ-5"));
+    expect(ranked.at(-1)).toBe("linear:LIQ-1");
+  });
+});
+

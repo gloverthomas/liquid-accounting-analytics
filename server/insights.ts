@@ -10,7 +10,7 @@ import { fixtureAnswerFor } from "./fixtures/responses.js";
 import type { GrokClient, GrokMessage } from "./grok/client.js";
 import { parseGrokResponse, type ParsedGrokAnswer } from "./grok/parseResponse.js";
 import { errorCode, logEvent } from "./log.js";
-import { GROK_INSIGHTS_SYSTEM_PROMPT, REPAIR_INSTRUCTION } from "./prompts/system.js";
+import { ANSWER_STYLES, GROK_INSIGHTS_SYSTEM_PROMPT, REPAIR_INSTRUCTION } from "./prompts/system.js";
 import { runRetrieval, type RetrievalDeps } from "./retrieval/index.js";
 import { planRetrieval, type RetrievalPlan } from "./retrieval/router.js";
 import type { RetrievedItem } from "./retrieval/types.js";
@@ -33,7 +33,7 @@ const DIGEST_ITEMS = 6;
 const FALLBACK_CITATIONS = 3;
 const DEFAULT_FOLLOW_UPS = ["What's going on with LIQ-24?", "What merged on Reporting this week?", "Is assistant-unit passing on Core main?"];
 
-function buildMessages(message: string, history: ChatTurn[], context: string, meta: RetrievalMeta): GrokMessage[] {
+function buildMessages(message: string, history: ChatTurn[], context: string, meta: RetrievalMeta, plan: RetrievalPlan): GrokMessage[] {
   const sampleNote = Object.entries(meta.connectorModes)
     .map(([connector, mode]) => `${connector}=${mode}`)
     .join(", ");
@@ -43,7 +43,7 @@ function buildMessages(message: string, history: ChatTurn[], context: string, me
     ...history.map((turn) => ({ role: turn.role, content: turn.content })),
     {
       role: "user",
-      content: `RETRIEVAL (connectors: ${sampleNote}; window: ${meta.window}; truncated: ${meta.truncated})\n<<<\n${retrieval}\n>>>\n\nQUESTION: ${message}`,
+      content: `RETRIEVAL (connectors: ${sampleNote}; window: ${meta.window}; truncated: ${meta.truncated})\n<<<\n${retrieval}\n>>>\n\n${ANSWER_STYLES[plan.style]}\n\nQUESTION: ${message}`,
     },
   ];
 }
@@ -104,7 +104,7 @@ export async function answerQuestion(message: string, history: ChatTurn[], confi
   if (deps.grok && items.length) {
     try {
       const knownIds = new Set(items.map((item) => item.citation.id));
-      const parsed = await synthesize(deps.grok, buildMessages(message, history, context, meta), knownIds);
+      const parsed = await synthesize(deps.grok, buildMessages(message, history, context, meta, plan), knownIds);
       if (parsed) {
         return {
           reply: parsed.reply,
