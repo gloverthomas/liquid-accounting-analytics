@@ -13,10 +13,6 @@ interface InsightsHeroProps {
 export function InsightsHero({ draft, onDraftChange, onAsk, prompts, disabled }: InsightsHeroProps) {
   return (
     <section className="hero" aria-labelledby="hero-heading">
-      <p className="kicker reveal reveal-1">
-        <span className="kicker-dot" aria-hidden="true" />
-        Linear · GitHub · CI, read-only
-      </p>
       <h1 id="hero-heading" className="hero-title reveal reveal-2">
         What do you want <em>to know?</em>
       </h1>

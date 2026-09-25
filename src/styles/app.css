@@ -132,7 +132,6 @@ a { color: inherit; }
 
 /* Staged load sequence (compositor-only properties). */
 .reveal { opacity: 0; transform: translateY(10px); animation: reveal 700ms var(--ease-out-expo) forwards; }
-.reveal-1 { animation-delay: 40ms; }
 .reveal-2 { animation-delay: 120ms; }
 .reveal-3 { animation-delay: 220ms; }
 .reveal-4 { animation-delay: 320ms; }
