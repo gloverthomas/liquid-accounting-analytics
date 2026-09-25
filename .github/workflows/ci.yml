@@ -16,6 +16,7 @@ env:
   POSTHOG_PROJECT_TOKEN: ""
   POSTHOG_PERSONAL_API_KEY: ""
   SENTRY_AUTH_TOKEN: ""
+  WORKFLOW_API_TOKEN: ""
 
 jobs:
   build:

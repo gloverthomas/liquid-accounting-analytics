@@ -32,6 +32,12 @@ export const ANSWER_STYLES = {
 - Then a line "**Key items**" followed by 3-8 bullets, most important first. Each bullet: **ID or repo #PR: short title** (exact current state) — one line on why it matters — [its id].
 - If both resolved and open items matter, say which is which. Cite every item you mention; don't list bare ids without titles.
 - Put the "citations" array in the same order as the Key items, and only include sources you actually cited.`,
+  plan: `ANSWER STYLE: Cursor plan summary.
+- Headline in **bold**: what Cursor plans to fix for the ticket, in one sentence.
+- Then bullets with **bold labels**: **Scope** (repos/components), **Steps & PR order**, **Tests & proof**, **Out of scope**, **Eval verdict** (n/m checks passed; name any failed checks).
+- It is a PLAN: never say anything was implemented, merged or deployed. Say the full plan is in the linked Cursor agent run. The transcript is working notes — extract the converged decisions, not the exploration.`,
+  pipeline: `ANSWER STYLE: pipeline.
+- The app draws the full timeline, so don't list every stage. Headline in **bold**: where the ticket is now. Then 2-4 bullets: what's done, what's blocking, and the exact next step (e.g. "approve the plan", "move to In Review", "merge PR #12").`,
   direct: `ANSWER STYLE: direct.
 - Lead with a one-sentence answer in **bold**, then 1-5 short bullets with **bold labels** and citations.`,
 } as const;

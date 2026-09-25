@@ -3,7 +3,9 @@
  * citation mapping. Falls back to a canned sample answer or a deterministic
  * digest — never to an answer that contradicts the retrieved sources.
  */
-import type { ChartSpec, ChatTurn, Citation, ProposedAction, Provider, RetrievalMeta } from "../shared/contracts.js";
+import type { ChartSpec, ChatTurn, Citation, PipelineTimeline, ProposedAction, Provider, RetrievalMeta } from "../shared/contracts.js";
+import { proposeImplement } from "./actions/workflowImplement.js";
+import { runWorkflowQuestion } from "./workflowQuestions.js";
 import { detectTicketAction, proposeTransition } from "./actions/linearTransition.js";
 import type { Config } from "./config.js";
 import { fixtureAnswerFor } from "./fixtures/responses.js";
@@ -23,6 +25,7 @@ export interface InsightAnswer {
   retrievalMeta: RetrievalMeta;
   proposedAction?: ProposedAction;
   charts?: ChartSpec[];
+  timeline?: PipelineTimeline;
 }
 
 export interface InsightDeps extends RetrievalDeps {
@@ -31,6 +34,7 @@ export interface InsightDeps extends RetrievalDeps {
 }
 
 const DIGEST_ITEMS = 6;
+const WORKFLOW_INTENTS = new Set(["workflow_plan", "evals", "pipeline"]);
 const FALLBACK_CITATIONS = 3;
 const DEFAULT_FOLLOW_UPS = ["What's going on with LIQ-24?", "What merged on Reporting this week?", "Is assistant-unit passing on Core main?"];
 
@@ -100,8 +104,27 @@ export async function answerQuestion(message: string, history: ChatTurn[], confi
   if (action) return proposeTransition(action, config, deps);
 
   const plan = planRetrieval(message, config.github.repos);
-  const { context, items, meta, charts } = await runRetrieval(plan, config, deps);
-  const chartPart = charts.length ? { charts } : {};
+  const workflowIntent = WORKFLOW_INTENTS.has(plan.intent);
+  const workflow = workflowIntent ? await runWorkflowQuestion(plan, config, deps.fetch, (deps.now ?? Date.now)()) : null;
+  const { context, items, meta, charts } = workflow ?? (await runRetrieval(plan, config, deps));
+  // Plan answers offer "Approve & implement" when the plan's eval passed (still confirm-gated).
+  const proposal = workflow?.plan?.evalPassed ? await proposeImplement(workflow.plan.issueId, config, deps).catch(() => null) : null;
+  const chartPart = {
+    ...(charts.length ? { charts } : {}),
+    ...(workflow?.timeline ? { timeline: workflow.timeline } : {}),
+    ...(proposal ? { proposedAction: proposal } : {}),
+  };
+
+  // Workflow questions with nothing to cite (service down / no runs) say why, rather than "found nothing".
+  const workflowNoData =
+    workflowIntent && !items.length
+      ? {
+          reply: `**${context.replace(/^\[workflow:none\]\s*|^WORKFLOW SERVICE UNAVAILABLE:\s*/, "").split(/(?<=\.)\s/)[0]}**\n\n${context.includes("UNAVAILABLE") ? "Start it with `NODE_ENV=development npm start` in liquid-workflow, then ask again." : ""}`.trim(),
+          citations: [],
+          relatedQuestions: ["How are our evals tracking?", "Which tickets are still in progress?", "Move LIQ-17 to In Progress"],
+          provider: "digest" as const,
+        }
+      : null;
 
   if (deps.grok && items.length) {
     try {
@@ -121,8 +144,8 @@ export async function answerQuestion(message: string, history: ChatTurn[], confi
     } catch (error) {
       logEvent("grok_fallback", { requestId: deps.requestId, grok_error: errorCode(error) });
     }
-    return { ...fallbackAnswer(plan, items, meta, "failed"), retrievalMeta: meta, ...chartPart };
+    return { ...(workflowNoData ?? fallbackAnswer(plan, items, meta, "failed")), retrievalMeta: meta, ...chartPart };
   }
 
-  return { ...fallbackAnswer(plan, items, meta, deps.grok ? "failed" : "unconfigured"), retrievalMeta: meta, ...chartPart };
+  return { ...(workflowNoData ?? fallbackAnswer(plan, items, meta, deps.grok ? "failed" : "unconfigured")), retrievalMeta: meta, ...chartPart };
 }

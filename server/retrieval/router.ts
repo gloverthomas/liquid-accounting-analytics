@@ -3,13 +3,13 @@
  * hit, for which repos, over what window.
  */
 
-export type Intent = "insights_usage" | "issue_status" | "ci_health" | "trend" | "problems" | "merged_prs" | "linear_overview" | "general";
+export type Intent = "workflow_plan" | "evals" | "pipeline" | "insights_usage" | "issue_status" | "ci_health" | "trend" | "problems" | "merged_prs" | "linear_overview" | "general";
 
 /** Server-computed charts a question can ask for. */
-export type ChartKind = "prs_per_day" | "tickets_by_state" | "opened_vs_closed" | "ci_history" | "usage_trend" | "bff_health" | "assistant_usage" | "insights_topics" | "insights_daily" | "sentry_errors";
+export type ChartKind = "prs_per_day" | "tickets_by_state" | "opened_vs_closed" | "ci_history" | "usage_trend" | "bff_health" | "assistant_usage" | "insights_topics" | "insights_daily" | "sentry_errors" | "evals_daily" | "eval_checks";
 
 /** "overview" = narrative summary + key items; "direct" = short answer to a specific question. */
-export type AnswerStyle = "overview" | "direct";
+export type AnswerStyle = "overview" | "direct" | "plan" | "pipeline";
 
 export interface RetrievalPlan {
   intent: Intent;
@@ -50,6 +50,15 @@ const META_USAGE = [
   /\b(using|use|usage of|used)\b[^.?]*\b(insights|this (tool|bot|app|chat))\b/i,
   /\b(insights|this (tool|bot|app|chat))\b[^.?]*\b(usage|used|adoption)\b/i,
 ];
+/** Cursor SDK workflow questions (liquid-workflow). */
+const WORKFLOW_PLAN = [
+  /\b(cursor|agent|sdk|workflow)\b[^.?]*\bplan(s|ned|ning)?\b/i,
+  /\bplan(s|ned)?\b[^.?]*\b(for|to fix)\b[^.?]*\b[A-Z][A-Z0-9]{1,5}-\d{1,6}\b/i,
+  /\bwhat (does|will|would|is) (cursor|the agent)\b[^.?]*\b(plan|propose|fix|change|do)\b/i,
+];
+const EVAL_WORDS = /\b(evals?|evaluations?|eval (gate|harness|checks?|pass rate)|write[- ]gate|gates?)\b/i;
+const PIPELINE_WORDS = /\b(pipeline|timeline|journey|where is|how far (along|through)|progress of|stage|lifecycle)\b/i;
+
 export const isInsightsUsageQuestion = (message: string) => META_USAGE.some((re) => re.test(message));
 
 const SENTRY_WORDS = /\b(sentry|errors?|exceptions?|crash(es|ed|ing)?|erroring|breaking for users|user-facing|js errors?)\b/i;
@@ -68,6 +77,8 @@ const CHECK_NAMES = ["assistant-unit", "parity-proof", "help-proof", "smoke", "b
 
 function pickCharts(message: string, intent: Intent, linearStates: string[]): ChartKind[] {
   if (intent === "insights_usage") return ["insights_topics", "insights_daily"];
+  if (intent === "evals") return ["evals_daily", "eval_checks"];
+  if (intent === "workflow_plan" || intent === "pipeline") return [];
   const charts: ChartKind[] = [];
   const wantsChart = CHART_WORDS.test(message);
   if (MERGE_WORDS.test(message) && (wantsChart || /\bhow many\b/i.test(message))) charts.push("prs_per_day");
@@ -131,6 +142,9 @@ function extractKeywords(lower: string): string[] {
 
 function classify(message: string, hasIssueIds: boolean, namesStates: boolean): Intent {
   if (isInsightsUsageQuestion(message)) return "insights_usage";
+  if (WORKFLOW_PLAN.some((re) => re.test(message))) return "workflow_plan";
+  if (EVAL_WORDS.test(message)) return "evals";
+  if (hasIssueIds && PIPELINE_WORDS.test(message)) return "pipeline";
   if (hasIssueIds) return "issue_status";
   if (TREND_WORDS.test(message)) return "trend";
   if (CI_WORDS.test(message)) return "ci_health";
@@ -158,7 +172,14 @@ export function planRetrieval(message: string, configuredRepos: string[]): Retri
     wantsSentry: intent === "problems" || SENTRY_WORDS.test(message),
     wantsPosthog: intent === "insights_usage" || intent === "trend" || PRODUCT_WORDS.test(message) || BFF_WORDS.test(message),
     keywords: extractKeywords(lower),
-    style: ["problems", "trend", "general", "insights_usage"].includes(intent) || OVERVIEW_WORDS.test(message) ? "overview" : "direct",
+    style:
+      intent === "workflow_plan"
+        ? "plan"
+        : intent === "pipeline"
+          ? "pipeline"
+          : ["problems", "trend", "general", "insights_usage", "evals"].includes(intent) || OVERVIEW_WORDS.test(message)
+            ? "overview"
+            : "direct",
     charts: pickCharts(message, intent, linearStates),
     checkName: CHECK_NAMES.find((name) => new RegExp(`\\b${name}\\b`, "i").test(message)) ?? null,
   };

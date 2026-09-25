@@ -21,7 +21,7 @@ export type QuestionOutcome = "answered" | "fallback" | "error";
 
 export interface QuestionRecord {
   topic: string;
-  style: "overview" | "direct" | "action";
+  style: "overview" | "direct" | "plan" | "pipeline" | "action";
   charts: string[];
   sources: string[];
   answerType: "grok" | "fixture" | "digest" | "action" | "none";

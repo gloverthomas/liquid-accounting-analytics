@@ -7,6 +7,8 @@
 import { useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ChartSpec } from "../../shared/contracts";
 import { chartColor, niceTicks, stackedTop } from "../lib/chart";
+import { ChartTable } from "./ChartTable";
+import { RankedBars } from "./RankedBars";
 
 interface ChartProps {
   chart: ChartSpec;
@@ -43,6 +45,10 @@ function useWidth<T extends HTMLElement>(): [React.RefObject<T | null>, number] 
 }
 
 export function Chart({ chart }: ChartProps) {
+  return chart.kind === "ranked" ? <RankedBars chart={chart} /> : <ColumnChart chart={chart} />;
+}
+
+function ColumnChart({ chart }: ChartProps) {
   const [wrapRef, width] = useWidth<HTMLDivElement>();
   const [hover, setHover] = useState<number | null>(null);
   const titleId = useId();
@@ -166,31 +172,7 @@ export function Chart({ chart }: ChartProps) {
         ) : null}
       </div>
 
-      <details className="chart-table">
-        <summary>Show data</summary>
-        <table>
-          <thead>
-            <tr>
-              <th scope="col">{chart.unit}</th>
-              {chart.series.map((s) => (
-                <th key={s.key} scope="col">
-                  {s.name}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {chart.categories.map((cat, i) => (
-              <tr key={cat}>
-                <th scope="row">{cat}</th>
-                {chart.series.map((s) => (
-                  <td key={s.key}>{s.values[i] ?? 0}</td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </details>
+      <ChartTable chart={chart} />
     </figure>
   );
 }

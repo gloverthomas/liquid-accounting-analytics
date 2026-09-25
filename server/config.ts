@@ -23,6 +23,8 @@ export interface Config {
   /** apiKey = personal key (read queries); projectToken = public phc_ token (writes the question log). */
   posthog: { apiKey: string | null; projectId: string | null; host: string; projectToken: string | null };
   sentry: { token: string | null; org: string; host: string; environment: string };
+  /** liquid-workflow control plane (Cursor SDK plans/evals). Token is server-side only. */
+  workflow: { baseUrl: string; token: string | null };
 }
 
 type Env = Record<string, string | undefined>;
@@ -79,6 +81,20 @@ function parseSentryHost(raw: string | null): string {
   return SENTRY_HOSTS.has(host) ? host : "https://us.sentry.io";
 }
 
+/** The workflow URL gets a bearer token, so only our own domain (or loopback in dev) is allowed. */
+function parseWorkflowUrl(raw: string | null, isProductionLike: boolean): string {
+  const fallback = "https://workflow.liquid-accounting.world";
+  const value = (raw ?? fallback).replace(/\/+$/, "");
+  try {
+    const url = new URL(value);
+    const ours = url.protocol === "https:" && (url.hostname === "liquid-accounting.world" || url.hostname.endsWith(".liquid-accounting.world"));
+    const loopback = !isProductionLike && url.protocol === "http:" && (url.hostname === "127.0.0.1" || url.hostname === "localhost");
+    return ours || loopback ? `${url.origin}` : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 function parseTimeout(raw: string | null): number {
   const value = Number.parseInt(raw ?? "", 10);
   return Number.isFinite(value) && value >= 1_000 && value <= 60_000 ? value : DEFAULT_XAI_TIMEOUT_MS;
@@ -125,6 +141,10 @@ export function loadConfig(env: Env = process.env): Config {
       branch: str(env, "GITHUB_BRANCH") ?? "main",
     },
     timeZone: parseTimeZone(str(env, "LIQUID_TIMEZONE")),
+    workflow: {
+      baseUrl: parseWorkflowUrl(str(env, "WORKFLOW_BASE_URL"), isProductionLike),
+      token: atLeast(str(env, "WORKFLOW_API_TOKEN"), 24),
+    },
     sentry: {
       token: str(env, "SENTRY_AUTH_TOKEN"),
       org: /^[a-z0-9-]{1,64}$/.test(str(env, "SENTRY_ORG") ?? "") ? str(env, "SENTRY_ORG")! : "liquid-accounting",

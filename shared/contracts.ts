@@ -3,9 +3,9 @@
  * the browser and server can never drift on field names.
  */
 
-export type ConnectorId = "linear" | "github" | "posthog" | "sentry" | "github_search";
+export type ConnectorId = "linear" | "github" | "posthog" | "sentry" | "github_search" | "workflow";
 
-export type CitationKind = "linear_issue" | "github_pr" | "github_check" | "posthog_insight" | "sentry_issue";
+export type CitationKind = "linear_issue" | "github_pr" | "github_check" | "posthog_insight" | "sentry_issue" | "workflow_run";
 
 export interface Citation {
   /** Stable retrieval id, e.g. `linear:LIQ-24` or `github:PR:owner/repo#10`. */
@@ -47,7 +47,8 @@ export type Provider = `grok:${string}` | "fixture" | "digest" | "action";
  * UI posts `token` to the action endpoint.
  */
 export interface ProposedAction {
-  kind: "linear_transition";
+  /** linear_transition: move a ticket. workflow_implement: approve the Cursor plan + move to In Review. */
+  kind: "linear_transition" | "workflow_implement";
   issueId: string;
   issueTitle: string;
   url: string;
@@ -70,11 +71,12 @@ export interface ChartSeries {
 
 /**
  * A server-computed chart. Numbers never come from the model, so they always
- * match the cited sources. "grouped" = side-by-side columns, "stacked" = one column split.
+ * match the cited sources. "grouped" = side-by-side columns, "stacked" = one column split,
+ * "ranked" = one series as horizontal bars, longest first (for long category names).
  */
 export interface ChartSpec {
   id: string;
-  kind: "grouped" | "stacked";
+  kind: "grouped" | "stacked" | "ranked";
   title: string;
   /** Window + source note, e.g. "Last 7 days · merged PRs on GitHub". */
   subtitle: string;
@@ -89,6 +91,25 @@ export interface ChartSpec {
 export const MAX_CHART_CATEGORIES = 31;
 export const MAX_CHART_SERIES = 4;
 
+/** One stage of a ticket's journey through the Cursor workflow (pipeline tracker). */
+export interface TimelineStep {
+  key: "signal" | "planning" | "eval" | "approval" | "implement" | "pr" | "merged" | "done";
+  label: string;
+  status: "done" | "current" | "pending" | "failed" | "skipped";
+  /** ISO time the stage happened, when known. */
+  at: string | null;
+  detail: string;
+  url: string | null;
+}
+
+export interface PipelineTimeline {
+  issueId: string;
+  title: string;
+  url: string;
+  state: string;
+  steps: TimelineStep[];
+}
+
 export interface ChatResponse {
   requestId: string;
   reply: string;
@@ -99,6 +120,7 @@ export interface ChatResponse {
   latencyMs: number;
   proposedAction?: ProposedAction;
   charts?: ChartSpec[];
+  timeline?: PipelineTimeline;
 }
 
 export interface Organisation {

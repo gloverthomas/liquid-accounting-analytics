@@ -5,6 +5,7 @@ import type { ThreadEntry } from "../hooks/useInsightsChat";
 import { ActionProposal } from "./ActionProposal";
 import { AnswerMarkdown } from "./AnswerMarkdown";
 import { Chart } from "./Chart";
+import { PipelineTimeline } from "./PipelineTimeline";
 import { CitationList } from "./CitationList";
 import { PromptPills } from "./PromptPills";
 import { SourcesAccordion } from "./SourcesAccordion";
@@ -57,6 +58,7 @@ function AssistantCard({ entryId, response, onAsk, disabled, isLatest, onConfirm
         {sourceBadge(response)}
       </header>
       <AnswerMarkdown text={response.reply} citationIndex={citationIndex} anchorPrefix={anchorPrefix} />
+      {response.timeline ? <PipelineTimeline timeline={response.timeline} /> : null}
       {response.charts?.map((chart) => <Chart key={chart.id} chart={chart} />)}
       {response.proposedAction && isLatest ? (
         <ActionProposal

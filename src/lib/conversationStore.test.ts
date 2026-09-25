@@ -98,5 +98,16 @@ describe("conversationStore", () => {
     const [bad] = parseConversations(JSON.stringify([withAction({ kind: "rm -rf", token: 1 })]));
     expect(bad.entries[0].role === "assistant" && bad.entries[0].response.proposedAction).toBeUndefined();
   });
-});
 
+  it("keeps workflow_implement proposals and valid timelines, drops malformed timelines", () => {
+    const action = { kind: "workflow_implement", issueId: "LIQ-24", issueTitle: "t", url: "https://x", fromState: "Todo", toState: "In Review", token: "tok", expiresAt: 1 };
+    const timeline = { issueId: "LIQ-24", title: "t", url: "https://x", state: "Todo", steps: [{ key: "signal", label: "Triage", status: "done", at: null, detail: "d", url: null }] };
+    const withParts = (extra: object) => conv("c", 1, { entries: [{ id: "a", role: "assistant", response: { ...chatResponse(), ...extra } as never }] });
+    const [good] = parseConversations(JSON.stringify([withParts({ proposedAction: action, timeline })]));
+    const res = good.entries[0].role === "assistant" ? good.entries[0].response : null;
+    expect(res?.proposedAction).toEqual(action);
+    expect(res?.timeline).toEqual(timeline);
+    const [bad] = parseConversations(JSON.stringify([withParts({ timeline: { ...timeline, steps: [{ key: "x", status: "exploded" }] } })]));
+    expect(bad.entries[0].role === "assistant" && bad.entries[0].response.timeline).toBeUndefined();
+  });
+});

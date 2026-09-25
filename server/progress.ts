@@ -18,6 +18,8 @@ const CHART_NAMES: Record<ChartKind, string> = {
   insights_topics: "questions by topic",
   insights_daily: "questions per day",
   sentry_errors: "Sentry events per day",
+  evals_daily: "evals passed vs failed per day",
+  eval_checks: "most-failed eval checks",
 };
 
 function list(items: string[]): string {
@@ -34,6 +36,22 @@ export function progressSteps(message: string, config: Config): string[] {
   }
 
   const plan = planRetrieval(message, config.github.repos);
+  const grokStep = config.xai.apiKey ? "Asking Grok to write it up…" : "Putting the answer together…";
+  const id = plan.issueIds[0];
+  if (plan.intent === "workflow_plan") {
+    return [
+      `Finding the latest Cursor plan run${id ? ` for ${id}` : ""} in liquid-workflow…`,
+      "Reading the plan transcript and its eval checklist…",
+      "Checking whether it's ready to approve…",
+      config.xai.apiKey ? "Asking Grok to summarise the plan…" : "Putting the answer together…",
+    ];
+  }
+  if (plan.intent === "evals") {
+    return ["Reading eval reports from liquid-workflow…", "Building 2 charts: evals passed vs failed per day and most-failed eval checks…", grokStep];
+  }
+  if (plan.intent === "pipeline" && id) {
+    return [`Reading ${id}'s history in Linear…`, "Checking Cursor runs, evals and approvals…", `Finding PRs that mention ${id}…`, "Drawing the pipeline…", grokStep];
+  }
   if (plan.intent === "insights_usage") {
     return [
       "Reading the Insights question log from PostHog (topics only, no question text)…",

@@ -42,20 +42,33 @@ function isResponse(v: unknown): v is ChatResponse {
 function isProposal(v: unknown): boolean {
   return (
     isObject(v) &&
-    v.kind === "linear_transition" &&
+    (v.kind === "linear_transition" || v.kind === "workflow_implement") &&
     ["issueId", "issueTitle", "url", "fromState", "toState", "token"].every((k) => typeof v[k] === "string") &&
     typeof v.expiresAt === "number"
   );
 }
 
-/** Keeps valid proposals/charts; drops malformed ones (the server re-validates tokens anyway). */
+const STEP_STATUSES = new Set(["done", "current", "pending", "failed", "skipped"]);
+
+function isTimeline(v: unknown): boolean {
+  return (
+    isObject(v) &&
+    ["issueId", "title", "url", "state"].every((k) => typeof v[k] === "string") &&
+    Array.isArray(v.steps) &&
+    v.steps.length <= 12 &&
+    v.steps.every((st) => isObject(st) && typeof st.key === "string" && typeof st.label === "string" && typeof st.detail === "string" && STEP_STATUSES.has(st.status as string))
+  );
+}
+
+/** Keeps valid proposals/charts/timelines; drops malformed ones (the server re-validates tokens anyway). */
 function sanitizeResponse(response: ChatResponse): ChatResponse {
-  const { proposedAction, charts, ...rest } = response;
+  const { proposedAction, charts, timeline, ...rest } = response;
   const cleanCharts = Array.isArray(charts) ? charts.map(sanitizeChart).filter((c): c is ChartSpec => c !== null) : [];
   return {
     ...rest,
     ...(proposedAction !== undefined && isProposal(proposedAction) ? { proposedAction } : {}),
     ...(cleanCharts.length ? { charts: cleanCharts } : {}),
+    ...(timeline !== undefined && isTimeline(timeline) ? { timeline } : {}),
   };
 }
 

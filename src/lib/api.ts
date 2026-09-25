@@ -40,6 +40,7 @@ export const api = {
   chat: (body: ChatRequest, signal?: AbortSignal) => request<ChatResponse>("/api/v1/insights/chat", { method: "POST", body: JSON.stringify(body), signal }),
   progress: (message: string) => request<{ steps: string[] }>("/api/v1/insights/progress", { method: "POST", body: JSON.stringify({ message }) }).then((r) => r.steps),
   confirmTransition: (token: string) => request<ChatResponse>("/api/v1/actions/linear-transition", { method: "POST", body: JSON.stringify({ token }) }),
+  confirmImplement: (token: string) => request<ChatResponse>("/api/v1/actions/workflow-implement", { method: "POST", body: JSON.stringify({ token }) }),
   createSession: (accessCode: string) => request<void>("/api/v1/session", { method: "POST", body: JSON.stringify({ accessCode }) }),
   endSession: () => request<void>("/api/v1/session", { method: "DELETE" }),
 };
@@ -61,6 +62,10 @@ export function describeError(error: unknown): string {
     case "issue_outside_team":
     case "state_not_allowed":
       return "That move isn't allowed from here.";
+    case "workflow_unavailable":
+      return "The Cursor workflow service didn't respond. It may be stopped; try again once it's running.";
+    case "workflow_auth_failed":
+      return "Insights couldn't authenticate with the workflow service. Check WORKFLOW_API_TOKEN.";
     case "actions_not_configured":
       return "Moving tickets isn't switched on for this deployment.";
     default:

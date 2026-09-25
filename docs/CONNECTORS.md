@@ -41,6 +41,16 @@ All connectors are **read-only** and run on the server only. The browser never t
   - The "Sentry events per day, Core vs Reporting" chart.
 - **Without a token:** skipped entirely (there's no sample Sentry data).
 
+## liquid-workflow (`server/retrieval/workflow.ts`, `server/workflowQuestions.ts`)
+
+- **Auth:** `WORKFLOW_API_TOKEN` as a bearer token, server-side only. `WORKFLOW_BASE_URL` must be `https://*.liquid-accounting.world` (loopback only outside production), so the token can't be sent elsewhere.
+- **Calls:** `GET /runs` (summaries), `GET /runs/:id` (one plan transcript), `GET /evals/reports`, `GET /gates?issue=`; `POST /approve` only from a confirmed Approve & implement.
+- **Output:**
+  - Plan: one cited `workflow:run:<id>` item with the eval checklist and the end of the transcript.
+  - Evals: a server-computed EVAL COUNTS block, the "evals per day" stacked chart and the "most-failed checks" ranked chart.
+  - Pipeline: a timeline built from Linear history, workflow runs, evals, gates and PRs that mention the ticket.
+- **Without a token, or when the service is down:** the answer says the workflow service is unavailable.
+
 ## Code search
 
 - Not in the MVP (spec v2).

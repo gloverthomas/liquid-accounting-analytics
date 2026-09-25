@@ -33,7 +33,7 @@ export interface TicketActionIntent {
   targetState: string | null;
 }
 
-interface IssueNode {
+export interface IssueNode {
   id: string;
   identifier: string;
   title: string;
@@ -68,7 +68,7 @@ const meta = (itemCount: number): RetrievalMeta => ({
   itemCount,
 });
 
-const citationFor = (issue: IssueNode, status = issue.state.name): Citation => ({
+export const citationFor = (issue: IssueNode, status = issue.state.name): Citation => ({
   id: `linear:${issue.identifier}`,
   kind: "linear_issue",
   title: `${issue.identifier} ${issue.title}`.slice(0, 120),
@@ -76,15 +76,15 @@ const citationFor = (issue: IssueNode, status = issue.state.name): Citation => (
   status,
 });
 
-function answer(reply: string, citations: Citation[], relatedQuestions: string[], proposedAction?: ProposedAction): InsightAnswer {
+export function answer(reply: string, citations: Citation[], relatedQuestions: string[], proposedAction?: ProposedAction): InsightAnswer {
   return { reply, citations, relatedQuestions, provider: "action", retrievalMeta: meta(citations.length), ...(proposedAction ? { proposedAction } : {}) };
 }
 
-function inTeam(issue: IssueNode, config: Config): boolean {
+export function inTeam(issue: IssueNode, config: Config): boolean {
   return config.linear.teamId ? issue.team.id === config.linear.teamId : issue.team.key.toUpperCase() === config.linear.teamKey.toUpperCase();
 }
 
-async function fetchIssue(identifier: string, apiKey: string, fetch: FetchLike): Promise<IssueNode | null> {
+export async function fetchIssue(identifier: string, apiKey: string, fetch: FetchLike): Promise<IssueNode | null> {
   const { data, errors } = await graphql<{ issue: IssueNode | null }>({ apiKey, fetch }, `query Issue($id: String!) { issue(id: $id) { ${ISSUE_FIELDS} } }`, { id: identifier });
   if (!data && errors.length && !JSON.stringify(errors).toLowerCase().includes("not found")) throw new Error("linear_graphql_error");
   return data?.issue ?? null;
@@ -172,6 +172,7 @@ export async function executeTransition(token: unknown, config: Config, deps: Ac
 
   const check = verifyActionToken(token, secret, (deps.now ?? Date.now)());
   if (!check.ok) throw new ActionError(check.reason === "expired" ? 410 : 400, check.reason === "expired" ? "confirmation_expired" : "invalid_confirmation");
+  if (check.claim.action !== "linear_transition") throw new ActionError(400, "invalid_confirmation");
   const { issueId, toState } = check.claim;
   if (!config.actions.allowedStates.includes(toState)) throw new ActionError(403, "state_not_allowed");
 
@@ -183,8 +184,23 @@ export async function executeTransition(token: unknown, config: Config, deps: Ac
     return answer(`**${issueId} was already ${toState}**, so nothing changed. [linear:${issueId}]`, [citationFor(issue)], [`What's the status of ${issueId}?`]);
   }
 
+  await moveIssue(issue, toState, writeKey, deps.fetch, `Moved from **${fromState}** to **${toState}** from Liquid Insights (confirmed in the app).`);
+  logEvent("linear_transition", { status: `${issueId}:${fromState}->${toState}` });
+
+  return answer(
+    `**Moved ${issueId} to ${toState}.** It was ${fromState}. [linear:${issueId}]\n- **Audit:** a comment recording this change was added to the ticket.\n- **Next:** if the Linear webhook is connected, the Cursor workflow picks it up (plan → eval → your approval before any PR).`,
+    [citationFor(issue, toState)],
+    [`What's the status of ${issueId}?`, "Which tickets are still in progress?", "What merged this week?"],
+  );
+}
+
+/**
+ * Moves an issue to a named state in its own team, then leaves an audit comment
+ * (best effort — the move already happened). Throws ActionError on refusal.
+ */
+export async function moveIssue(issue: IssueNode, toState: string, writeKey: string, fetch: FetchLike, auditBody: string): Promise<void> {
   const states = await graphql<{ workflowStates: { nodes: Array<{ id: string; name: string }> } }>(
-    { apiKey: writeKey, fetch: deps.fetch },
+    { apiKey: writeKey, fetch },
     `query State($filter: WorkflowStateFilter) { workflowStates(filter: $filter) { nodes { id name } } }`,
     { filter: { team: { id: { eq: issue.team.id } }, name: { eq: toState } } },
   );
@@ -192,23 +208,15 @@ export async function executeTransition(token: unknown, config: Config, deps: Ac
   if (!stateId) throw new ActionError(422, "state_not_in_team");
 
   const updated = await graphql<{ issueUpdate: { success: boolean; issue: { state: { name: string } } | null } }>(
-    { apiKey: writeKey, fetch: deps.fetch },
+    { apiKey: writeKey, fetch },
     `mutation Move($id: String!, $stateId: String!) { issueUpdate(id: $id, input: { stateId: $stateId }) { success issue { state { name } } } }`,
     { id: issue.id, stateId },
   );
   if (!updated.data?.issueUpdate.success) throw new ActionError(502, "linear_update_failed");
-  logEvent("linear_transition", { status: `${issueId}:${fromState}->${toState}` });
 
-  // Audit trail on the ticket itself. Best effort: the move already happened.
   await graphql(
-    { apiKey: writeKey, fetch: deps.fetch },
+    { apiKey: writeKey, fetch },
     `mutation Audit($input: CommentCreateInput!) { commentCreate(input: $input) { success } }`,
-    { input: { issueId: issue.id, body: `Moved from **${fromState}** to **${toState}** from Liquid Insights (confirmed in the app).` } },
+    { input: { issueId: issue.id, body: auditBody } },
   ).catch((error: unknown) => logEvent("linear_audit_comment_failed", { error: errorCode(error) }));
-
-  return answer(
-    `**Moved ${issueId} to ${toState}.** It was ${fromState}. [linear:${issueId}]\n- **Audit:** a comment recording this change was added to the ticket.\n- **Next:** if the Linear webhook is connected, the Cursor workflow picks it up (plan → eval → your approval before any PR).`,
-    [citationFor(issue, toState)],
-    [`What's the status of ${issueId}?`, "Which tickets are still in progress?", "What merged this week?"],
-  );
 }

@@ -37,6 +37,7 @@ With no keys it runs in **sample mode**: realistic LIQ-24 demo data and canned a
 | `SENTRY_AUTH_TOKEN` / `SENTRY_ORG` / `SENTRY_HOST` | Production errors | Read-only User Auth Token; production issues only, no stack traces |
 | `POSTHOG_PROJECT_TOKEN` | Insights question log | Public `phc_` token; categories only, never question text |
 | `LINEAR_ACTIONS_API_KEY` | Ticket moves | A **separate** Linear key with write access; without it the app stays read-only |
+| `WORKFLOW_BASE_URL` / `WORKFLOW_API_TOKEN` | Cursor plans, evals, pipeline, Approve & implement | liquid-workflow's `WORKFLOW_API_TOKEN` (≥24 chars); URL must be `https://*.liquid-accounting.world` (loopback allowed in dev) |
 
 The full list is in [`.env.example`](.env.example). If a key is set but that service fails, the answer marks it "unavailable" rather than quietly switching to sample data.
 
@@ -97,6 +98,18 @@ Ask "Move LIQ-17 to In Progress" (or "Start LIQ-17"):
 4. If the `liquid-workflow` Linear webhook is connected, moving to In Progress starts the Cursor SDK workflow (plan → eval → human approval before any PR).
 
 It is limited to `LIQUID_ACTIONS_ALLOWED_STATES` (default: In Progress), to the configured Linear team, and to 10 confirmations per minute per IP. Anyone with the access code can move tickets, so share the code accordingly.
+
+## Cursor workflow: plans, evals, pipeline
+
+Insights reads the [liquid-workflow](https://github.com/gloverthomas/liquid-workflow) service (Cursor SDK plan → eval → approval → implement):
+
+- **"What's the Cursor plan for LIQ-24?"** summarises the latest plan run (the agent's transcript) with its eval checklist. If the eval passed and the ticket is in Todo or In Progress, an **Approve & implement** card appears.
+- **"How are our evals tracking?"** gives the pass rate, the latest verdict per ticket, and two charts: evals per day (passed vs failed) and the most-failed checks.
+- **"Where is LIQ-24 in the pipeline?"** draws the ticket's journey: Triage → Cursor plan → Eval gate → Human approval → Implement → Pull requests → Merged → Done.
+
+**Approve & implement** works like a ticket move: a signed 5-minute token of its own kind (it can't be replayed as a plain move, or vice versa). Confirming records the human approval with the workflow (`POST /approve`, actor `liquid-insights`) and then moves the ticket to **In Review**, which the workflow's Linear webhook treats as "implement". The workflow still enforces its own eval, CI and write gates, and PRs still need a human to merge. It needs `LINEAR_ACTIONS_API_KEY` and `WORKFLOW_API_TOKEN`.
+
+If the service is down (it runs on a Mac behind a Cloudflare tunnel), answers say so instead of guessing.
 
 ## Security posture
 

@@ -240,5 +240,23 @@ describe("App", () => {
       expect(screen.queryByRole("region", { name: "Confirm moving LIQ-17" })).toBeNull();
       expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
     });
+
+    it("Approve & implement goes to the workflow endpoint, never the plain move", async () => {
+      const implement = { ...proposal, kind: "workflow_implement" as const, issueId: "LIQ-24", toState: "In Review", token: "impl-token" };
+      route({
+        "/api/v1/orgs": () => jsonRes(ORGS),
+        "/api/v1/suggested-prompts": () => jsonRes(PROMPTS),
+        "/api/v1/insights/chat": () => jsonRes(chatResponse({ reply: "**Plan for LIQ-24.**", relatedQuestions: [], proposedAction: implement })),
+        "/api/v1/actions/workflow-implement": () => jsonRes(chatResponse({ provider: "action", reply: "**Approved the Cursor plan for LIQ-24.**", relatedQuestions: [] })),
+      });
+      render(<App />);
+      await userEvent.type(await screen.findByRole("textbox"), "What's the Cursor plan for LIQ-24?{Enter}");
+      const card = await screen.findByRole("region", { name: "Confirm approving LIQ-24" });
+      await userEvent.click(within(card).getByRole("button", { name: "Approve & implement" }));
+      expect(await screen.findByText("Approved the Cursor plan for LIQ-24.")).toBeInTheDocument();
+      const call = fetchMock.mock.calls.find(([p]) => p === "/api/v1/actions/workflow-implement")!;
+      expect(JSON.parse(String(call[1]!.body))).toEqual({ token: "impl-token" });
+      expect(fetchMock.mock.calls.some(([p]) => p === "/api/v1/actions/linear-transition")).toBe(false);
+    });
   });
 });

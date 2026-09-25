@@ -131,7 +131,7 @@ export function useInsightsChat(orgId: string | undefined, conversationId: strin
       if (!proposal || storeRef.current.isPending(id)) return null;
       storeRef.current.setPending(id, true);
       try {
-        const response = await api.confirmTransition(proposal.token);
+        const response = proposal.kind === "workflow_implement" ? await api.confirmImplement(proposal.token) : await api.confirmTransition(proposal.token);
         clearProposal(id, entryId);
         storeRef.current.update(id, (prev) => [...prev, { id: nextId("a"), role: "assistant", response }]);
         return null;
@@ -140,7 +140,7 @@ export function useInsightsChat(orgId: string | undefined, conversationId: strin
         // offer "Try again", which asks afresh and yields a new proposal.
         if (error instanceof ApiRequestError && [400, 403, 404, 410].includes(error.status)) {
           clearProposal(id, entryId);
-          const retryOf = `Move ${proposal.issueId} to ${proposal.toState}`;
+          const retryOf = proposal.kind === "workflow_implement" ? `What's the Cursor plan for ${proposal.issueId}?` : `Move ${proposal.issueId} to ${proposal.toState}`;
           storeRef.current.update(id, (prev) => [...prev, { id: nextId("e"), role: "error", message: describeError(error), retryOf }]);
           return null;
         }

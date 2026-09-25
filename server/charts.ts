@@ -304,6 +304,9 @@ export function buildCharts(plan: RetrievalPlan, inputs: ChartInputs, nowMs: num
       case "insights_topics":
       case "insights_daily":
         return null; // built by the question-log path (retrieval/insightsUsage.ts)
+      case "evals_daily":
+      case "eval_checks":
+        return null; // built by the workflow path (server/workflowQuestions.ts)
       case "sentry_errors":
         return inputs.sentryDaily ? sentryErrors(inputs.sentryDaily, plan.sinceDays, nowMs, timeZone, inputs.sentryEnvironment ?? "production") : null;
     }

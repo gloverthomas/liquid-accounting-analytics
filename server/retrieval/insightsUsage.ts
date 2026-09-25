@@ -22,6 +22,9 @@ export const TOPIC_LABELS: Record<string, string> = {
   general: "General",
   ticket_move: "Ticket moves",
   insights_usage: "Insights usage",
+  workflow_plan: "Cursor plans",
+  evals: "Eval tracking",
+  pipeline: "Pipeline tracker",
 };
 
 export interface QuestionRow {

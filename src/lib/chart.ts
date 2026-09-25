@@ -37,7 +37,7 @@ const COLORS = new Set<string>(["series1", "series2", "good", "critical"]);
 export function sanitizeChart(value: unknown): ChartSpec | null {
   if (typeof value !== "object" || value === null) return null;
   const c = value as Record<string, unknown>;
-  if (c.kind !== "grouped" && c.kind !== "stacked") return null;
+  if (c.kind !== "grouped" && c.kind !== "stacked" && c.kind !== "ranked") return null;
   if (!["id", "title", "subtitle", "unit"].every((k) => typeof c[k] === "string") || typeof c.sample !== "boolean") return null;
   const categories = c.categories;
   if (!Array.isArray(categories) || !categories.length || categories.length > MAX_CHART_CATEGORIES || !categories.every((x) => typeof x === "string")) return null;

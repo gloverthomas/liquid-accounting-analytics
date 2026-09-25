@@ -123,3 +123,26 @@ export async function fetchLinearActivity(sinceIso: string, deps: LinearDeps): P
   if (!data?.issues) throw new Error(errors.length ? "linear_graphql_error" : "linear_empty_response");
   return data.issues.nodes;
 }
+
+
+export interface LinearIssueHistory {
+  identifier: string;
+  title: string;
+  url: string;
+  createdAt: string;
+  completedAt: string | null;
+  canceledAt: string | null;
+  state: { name: string; type?: string } | null;
+  history: { nodes: Array<{ createdAt: string; fromState: { name: string } | null; toState: { name: string } | null }> };
+}
+
+/** One issue with its state-change history, for the pipeline tracker. */
+export async function fetchIssueHistory(identifier: string, deps: Pick<LinearDeps, "apiKey" | "fetch">): Promise<LinearIssueHistory | null> {
+  const query = `query History($id: String!) { issue(id: $id) {
+    identifier title url createdAt completedAt canceledAt state { name type }
+    history(first: 50) { nodes { createdAt fromState { name } toState { name } } }
+  } }`;
+  const { data, errors } = await graphql<{ issue: LinearIssueHistory | null }>(deps, query, { id: identifier });
+  if (!data && errors.length && !JSON.stringify(errors).toLowerCase().includes("not found")) throw new Error("linear_graphql_error");
+  return data?.issue ?? null;
+}

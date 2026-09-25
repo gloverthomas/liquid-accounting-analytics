@@ -4,6 +4,7 @@
  */
 import { HISTORY_MAX_TURNS, MESSAGE_MAX_CHARS, MESSAGE_MIN_CHARS, type ChatResponse, type ChatTurn } from "../shared/contracts.js";
 import { ActionError, executeTransition } from "./actions/linearTransition.js";
+import { executeImplement } from "./actions/workflowImplement.js";
 import { accessCodeMatches, authenticate, buildSessionCookie, createSessionToken, sessionCookieName } from "./auth.js";
 import { sessionAuthEnabled, type Config } from "./config.js";
 import { createXaiClient, type GrokClient } from "./grok/client.js";
@@ -64,6 +65,7 @@ function connectorFlags(config: Config) {
     github: Boolean(config.github.token),
     posthog: Boolean(config.posthog.apiKey && config.posthog.projectId),
     questionLog: Boolean(config.posthog.projectToken),
+    workflow: Boolean(config.workflow.token),
     sentry: Boolean(config.sentry.token),
     fixtures: config.allowFixtures,
     actions: Boolean(config.actions.linearApiKey),
@@ -137,12 +139,12 @@ export function createApp(deps: AppDeps): AppHandler {
     return json(200, ctx.requestId, payload);
   }
 
-  async function handleTransition(request: Request, ctx: RequestContext): Promise<Response> {
+  async function handleTransition(request: Request, ctx: RequestContext, run = executeTransition): Promise<Response> {
     if (!limiter.allow(RATE_LIMITS.action, ctx.ip)) return errorResponse(429, ctx.requestId, "rate_limit_exceeded");
     const body = await readJsonBody(request);
     const started = now();
     try {
-      const answer = await executeTransition(body.token, config, { fetch: fetchImpl, now });
+      const answer = await run(body.token, config, { fetch: fetchImpl, now });
       return json(200, ctx.requestId, { ...answer, latencyMs: now() - started });
     } catch (error) {
       if (error instanceof ActionError) {
@@ -192,6 +194,7 @@ export function createApp(deps: AppDeps): AppHandler {
       return json(200, ctx.requestId, { steps: progressSteps(message, config) });
     }
     if (method === "POST" && path === "/api/v1/actions/linear-transition") return handleTransition(request, ctx);
+    if (method === "POST" && path === "/api/v1/actions/workflow-implement") return handleTransition(request, ctx, executeImplement);
     if (method !== "GET") return errorResponse(405, ctx.requestId, "method_not_allowed");
 
     switch (path) {

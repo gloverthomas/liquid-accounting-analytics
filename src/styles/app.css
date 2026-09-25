@@ -250,6 +250,7 @@ a { color: inherit; }
 .proposal-state-to { background: var(--status-wait-wash); color: var(--status-wait); font-weight: 600; }
 .proposal-title { margin-top: var(--space-2) !important; color: var(--color-ink); }
 .proposal-actions { display: flex; align-items: center; gap: var(--space-4); margin-top: var(--space-4); }
+.proposal-note { margin-top: var(--space-2) !important; font-size: var(--text-sm); color: var(--color-muted); }
 .proposal .field-error { margin-top: var(--space-3); }
 .spin { animation: spin 1s linear infinite; }
 
@@ -276,11 +277,51 @@ a { color: inherit; }
 .chart-tooltip > span { display: flex; align-items: center; gap: 6px; }
 .chart-tooltip b { margin-left: auto; padding-left: var(--space-3); font-variant-numeric: tabular-nums; }
 .chart-tooltip-total { border-top: 1px solid rgba(255, 255, 255, 0.18); padding-top: 3px; }
+.ranked { display: grid; gap: 6px; margin: var(--space-3) 0 0; padding: 0; list-style: none; }
+.ranked-row { display: grid; grid-template-columns: minmax(96px, 34%) 1fr 3ch; align-items: center; gap: var(--space-3); font-size: 12px; }
+.ranked-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-text); }
+.ranked-track { height: 14px; }
+.ranked-bar { display: block; height: 100%; min-width: 2px; border-radius: 0 4px 4px 0; }
+.ranked-value { font-family: var(--font-display); font-weight: 600; text-align: right; color: var(--color-ink); font-variant-numeric: tabular-nums; }
 .chart-table { margin-top: var(--space-2); font-size: var(--text-sm); }
 .chart-table summary { cursor: pointer; width: fit-content; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-muted); }
 .chart-table table { margin-top: var(--space-2); border-collapse: collapse; font-variant-numeric: tabular-nums; }
 .chart-table th, .chart-table td { padding: 3px var(--space-3) 3px 0; text-align: left; }
 .chart-table thead th { color: var(--color-muted); font-weight: 500; }
+
+/* ─── Pipeline tracker ─────────────────────────────────── */
+.pipeline { container-type: inline-size; margin: var(--space-4) 0 var(--space-2); padding: var(--space-4); background: var(--color-surface); border: 1px solid var(--color-rule); border-radius: var(--radius-md); }
+.pipeline-state { margin-left: var(--space-2); padding: 1px 8px; border-radius: var(--radius-pill); background: var(--status-neutral-wash); font-size: var(--text-xs); font-weight: 500; color: var(--color-text); }
+/* 8 stages: one row when there's room, otherwise two rows of four. */
+.pipeline-steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); row-gap: var(--space-5); margin: var(--space-4) 0 0; padding: 0; list-style: none; }
+@container (min-width: 880px) { .pipeline-steps { grid-template-columns: repeat(8, minmax(0, 1fr)); } }
+.pipeline-step { position: relative; padding: 0 var(--space-2) 0 0; }
+/* Connector line between dots; colour follows the stage it leads out of. */
+.pipeline-step::before { content: ""; position: absolute; top: 10px; left: 22px; right: 0; height: 2px; background: var(--color-rule-strong); }
+.pipeline-step:last-child::before { display: none; }
+@container (max-width: 879px) { .pipeline-step:nth-child(4n)::before { display: none; } }
+.pipeline-step[data-status="done"]::before { background: var(--chart-good); }
+.pipeline-dot {
+  position: relative; z-index: 1; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%;
+  background: var(--color-surface); border: 2px solid var(--color-rule-strong); color: var(--color-faint);
+}
+.pipeline-step[data-status="done"] .pipeline-dot { background: var(--chart-good); border-color: var(--chart-good); color: #fff; }
+.pipeline-step[data-status="failed"] .pipeline-dot { background: var(--chart-critical); border-color: var(--chart-critical); color: #fff; }
+.pipeline-step[data-status="current"] .pipeline-dot { border-color: var(--color-accent); color: var(--color-accent); box-shadow: 0 0 0 4px rgba(255, 41, 46, 0.15); }
+.pipeline-body { display: grid; gap: 2px; margin-top: var(--space-2); text-decoration: none; color: inherit; }
+a.pipeline-body:hover .pipeline-label { text-decoration: underline; text-underline-offset: 3px; }
+.pipeline-label { font-size: var(--text-sm); font-weight: 600; color: var(--color-ink); }
+.pipeline-step[data-status="pending"] .pipeline-label, .pipeline-step[data-status="skipped"] .pipeline-label { color: var(--color-muted); font-weight: 500; }
+.pipeline-detail { font-size: 12px; line-height: 1.35; color: var(--color-muted); overflow-wrap: anywhere; }
+.pipeline-time { font-family: var(--font-mono); font-size: 10px; color: var(--color-faint); }
+@container (max-width: 520px) {
+  .pipeline-steps { grid-template-columns: 1fr; gap: var(--space-3); }
+  .pipeline-step:nth-child(4n)::before { display: block; }
+  .pipeline-step:last-child::before { display: none; }
+  .pipeline-step { display: grid; grid-template-columns: 22px 1fr; column-gap: var(--space-3); }
+  .pipeline-step::before { top: 22px; bottom: calc(-1 * var(--space-3)); left: 10px; right: auto; width: 2px; height: auto; }
+  .pipeline-body { margin-top: 0; }
+}
 
 /* ─── Sources ──────────────────────────────────────────── */
 .sources { margin-top: var(--space-4); padding-top: var(--space-4); border-top: 1px dashed var(--color-rule-strong); }

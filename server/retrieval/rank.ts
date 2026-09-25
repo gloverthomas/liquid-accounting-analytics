@@ -18,6 +18,9 @@ const INTENT_BOOST: Record<Intent, Partial<Record<Kind, number>>> = {
   trend: { posthog_insight: 40, github_pr: 15, linear_issue: 10 },
   problems: { linear_issue: 20, github_check: 10, github_pr: 5, sentry_issue: 25 },
   insights_usage: { posthog_insight: 40 },
+  workflow_plan: { workflow_run: 60, linear_issue: 10 },
+  evals: { workflow_run: 40 },
+  pipeline: { workflow_run: 30, linear_issue: 30, github_pr: 20 },
   general: {},
 };
 
