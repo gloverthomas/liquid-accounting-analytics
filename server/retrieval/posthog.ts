@@ -1,9 +1,94 @@
 /**
- * PostHog is sample-only in the MVP: a pre-aggregated insight summary, never raw
- * events. Live PostHog is a v2 item (see docs/CONNECTORS.md).
+ * PostHog connector: fixed aggregate HogQL over allowlisted events and
+ * properties only (the same allowlist Core/Reporting send). No raw events, no
+ * person data, and no user text is ever interpolated into the query.
  */
-import type { RetrievedItem } from "./types.js";
+import { CONNECTOR_TIMEOUT_MS, type FetchLike, type RetrievedItem } from "./types.js";
 
+export const POSTHOG_EVENTS = ["$pageview", "product_navigation", "report_opened", "bff_status", "create_dialog_opened", "invoice_deep_link_miss"] as const;
+const ACTIVITY_EVENTS = new Set(["$pageview", "product_navigation", "report_opened", "create_dialog_opened"]);
+const MAX_DAYS = 30;
+const ROW_LIMIT = 5000;
+
+export interface PosthogDeps {
+  apiKey: string;
+  projectId: string;
+  host: string;
+  fetch: FetchLike;
+}
+
+/** One aggregate row: hourly count of an event per app ("core" | "reporting"). */
+export interface PosthogRow {
+  hour: string;
+  event: string;
+  app: string;
+  /** "true"/"false" for bff_status, "" otherwise. */
+  connected: string;
+  n: number;
+}
+
+function activityQuery(days: number): string {
+  const window = Math.min(Math.max(Math.trunc(days), 1), MAX_DAYS);
+  const events = POSTHOG_EVENTS.map((e) => `'${e}'`).join(", ");
+  return `SELECT toStartOfHour(timestamp) AS hour, event,
+  coalesce(properties.source, properties.app, if(properties.$host LIKE '%reporting%', 'reporting', 'core')) AS app,
+  if(event = 'bff_status', toString(properties.connected), '') AS connected,
+  count() AS n
+FROM events
+WHERE event IN (${events}) AND timestamp > now() - INTERVAL ${window} DAY
+GROUP BY hour, event, app, connected ORDER BY hour LIMIT ${ROW_LIMIT}`;
+}
+
+export async function fetchPosthogActivity(days: number, deps: PosthogDeps): Promise<PosthogRow[]> {
+  const res = await deps.fetch(`${deps.host}/api/projects/${deps.projectId}/query/`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${deps.apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ query: { kind: "HogQLQuery", query: activityQuery(days) } }),
+    signal: AbortSignal.timeout(CONNECTOR_TIMEOUT_MS),
+  });
+  if (!res.ok) throw new Error(`posthog_${res.status}`);
+  const body = (await res.json()) as { results?: unknown[][] };
+  return (body.results ?? []).map((r) => ({
+    hour: String(r[0]),
+    event: String(r[1]),
+    app: String(r[2] ?? "core").toLowerCase() === "reporting" ? "reporting" : "core",
+    connected: String(r[3] ?? ""),
+    n: Number(r[4]) || 0,
+  }));
+}
+
+const sum = (rows: PosthogRow[]) => rows.reduce((a, r) => a + r.n, 0);
+
+/** Summary item for Grok. Also says plainly what is NOT tracked, so answers don't overreach. */
+export function normalizePosthogActivity(rows: PosthogRow[], days: number, deps: Pick<PosthogDeps, "host" | "projectId">, nowIso: string): RetrievedItem {
+  const id = `posthog:activity:${days}d`;
+  const byEvent = POSTHOG_EVENTS.map((e) => {
+    const ev = rows.filter((r) => r.event === e);
+    return `${e} ${sum(ev)} (core ${sum(ev.filter((r) => r.app === "core"))}, reporting ${sum(ev.filter((r) => r.app === "reporting"))})`;
+  }).join("; ");
+  const bff = rows.filter((r) => r.event === "bff_status");
+  const disconnected = bff.filter((r) => r.connected === "false");
+  const activity = rows.filter((r) => ACTIVITY_EVENTS.has(r.event));
+  const daysActive = new Set(activity.map((r) => r.hour.slice(0, 10))).size;
+  return {
+    connector: "posthog",
+    citation: {
+      id,
+      kind: "posthog_insight",
+      title: `PostHog product activity · last ${days} days`,
+      url: `${deps.host}/project/${deps.projectId}/activity/explore`,
+      status: "live",
+    },
+    text: `[${id}] NOT TRACKED: AI Assistant usage has no PostHog event, so assistant usage/adoption CANNOT be measured here — the numbers below are general product activity, not assistant usage. PostHog (allowlisted, aggregated events; no personal data), last ${days} days: ${byEvent}. Product activity events total ${sum(activity)} across ${daysActive} active day(s). BFF status: ${sum(bff)} checks, ${sum(disconnected)} reported NOT connected (core ${sum(disconnected.filter((r) => r.app === "core"))}, reporting ${sum(disconnected.filter((r) => r.app === "reporting"))}).`,
+    updatedAt: activity.at(-1)?.hour ?? nowIso,
+    mentions: [],
+  };
+}
+
+/**
+ * Sample insight used when PostHog isn't configured. Pre-aggregated, never raw
+ * events.
+ */
 export function samplePosthogInsight(nowIso: string): RetrievedItem {
   const id = "posthog:insight:assistant-adoption-28d";
   return {

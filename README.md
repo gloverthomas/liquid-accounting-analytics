@@ -33,6 +33,7 @@ With no keys it runs in **sample mode**: realistic LIQ-24 demo data and canned a
 | `GITHUB_REPOS` | – | Defaults to Core + Reporting |
 | `LIQUID_BFF_DEMO_TOKEN` | Local dev auth | Injected by the Vite proxy; never in the bundle |
 | `LIQUID_INSIGHTS_ACCESS_CODE` / `LIQUID_SESSION_SECRET` | **Hosted auth** | Required on Vercel, or every API route returns 503 |
+| `POSTHOG_PERSONAL_API_KEY` / `POSTHOG_PROJECT_ID` / `POSTHOG_HOST` | Live product analytics | Read-only key; host must be us/eu/app.posthog.com |
 | `LINEAR_ACTIONS_API_KEY` | Ticket moves | A **separate** Linear key with write access; without it the app stays read-only |
 
 The full list is in [`.env.example`](.env.example). If a key is set but that service fails, the answer marks it "unavailable" rather than quietly switching to sample data.
@@ -64,12 +65,14 @@ Some questions come back with a chart above the sources:
 | "Show our Linear tickets by status" / "Bugs in Todo vs Done" | Tickets by status, bugs stacked on other tickets |
 | "Are we closing bugs faster than we open them?" | Opened vs closed per week (last 4+ weeks) |
 | "How often has assistant-unit failed over the last 2 weeks?" | Passed vs failed per day, for that check or for all CI runs |
+| "How has product usage changed over the last 2 weeks?" | Product activity per day, Core vs Reporting (PostHog) |
+| "Is the BFF disconnecting? Show connection checks per day" | BFF connected vs not per day (PostHog) |
 
 - **The server computes every chart number** from Linear and GitHub data (`server/charts.ts`); Grok only writes the prose around it and is given the same numbers.
 - **Days follow `LIQUID_TIMEZONE`** (default Australia/Sydney). Windows up to 14 days are shown per day; longer ones per week.
 - **Colours are validated for colour blindness** with the dataviz checker: blue/orange for comparisons, green/red reserved for passed/failed.
 - **Each chart has a legend, a hover tooltip and a "Show data" table,** so no information is conveyed by colour alone.
-- **Product-usage trends aren't charted yet,** because PostHog is still sample-only.
+- **Product activity and BFF health charts come from PostHog,** using fixed aggregate queries over the same event and property allowlist the apps send (no raw events, no personal data, no user text in queries). AI Assistant usage **isn't tracked** in PostHog yet, and answers say so.
 
 ## Ticket moves
 

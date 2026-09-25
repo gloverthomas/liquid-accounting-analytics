@@ -20,6 +20,7 @@ export interface Config {
   github: { token: string | null; repos: string[]; branch: string };
   /** IANA zone for day/week chart buckets. */
   timeZone: string;
+  posthog: { apiKey: string | null; projectId: string | null; host: string };
 }
 
 type Env = Record<string, string | undefined>;
@@ -58,6 +59,14 @@ function parseTimeZone(raw: string | null): string {
   } catch {
     return "UTC";
   }
+}
+
+/** Only PostHog's own hosts: the key is sent there, so this must not be free-form (SSRF). */
+const POSTHOG_HOSTS = new Set(["https://us.posthog.com", "https://eu.posthog.com", "https://app.posthog.com"]);
+
+function parsePosthogHost(raw: string | null): string {
+  const host = (raw ?? "https://us.posthog.com").replace(/\/+$/, "");
+  return POSTHOG_HOSTS.has(host) ? host : "https://us.posthog.com";
 }
 
 function parseTimeout(raw: string | null): number {
@@ -106,6 +115,11 @@ export function loadConfig(env: Env = process.env): Config {
       branch: str(env, "GITHUB_BRANCH") ?? "main",
     },
     timeZone: parseTimeZone(str(env, "LIQUID_TIMEZONE")),
+    posthog: {
+      apiKey: str(env, "POSTHOG_PERSONAL_API_KEY"),
+      projectId: /^\d{1,12}$/.test(str(env, "POSTHOG_PROJECT_ID") ?? "") ? str(env, "POSTHOG_PROJECT_ID") : null,
+      host: parsePosthogHost(str(env, "POSTHOG_HOST")),
+    },
   };
 }
 

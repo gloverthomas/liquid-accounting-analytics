@@ -5,6 +5,7 @@
 import type { ChartSeries, ChartSpec } from "../shared/contracts.js";
 import type { RetrievalPlan } from "./retrieval/router.js";
 import type { LinearActivityNode } from "./retrieval/linear.js";
+import type { PosthogRow } from "./retrieval/posthog.js";
 import type { RetrievedItem } from "./retrieval/types.js";
 
 const DAY_MS = 86_400_000;
@@ -25,6 +26,7 @@ export interface ChartInputs {
   items: RetrievedItem[];
   activity?: LinearActivityNode[];
   runs?: CiRunPoint[];
+  posthog?: PosthogRow[];
   /** Per-dataset sample flags (sample connectors produce sample charts). */
   sample: { linear: boolean; github: boolean };
 }
@@ -180,6 +182,58 @@ export function ciHistory(runs: CiRunPoint[], days: number, nowMs: number, timeZ
   };
 }
 
+const PRODUCT_EVENTS = new Set(["$pageview", "product_navigation", "report_opened", "create_dialog_opened"]);
+
+/** Sum `n` per bucket (PostHog rows are pre-aggregated per hour). */
+function sumBy(buckets: Buckets, rows: PosthogRow[]): number[] {
+  const values = buckets.labels.map(() => 0);
+  for (const r of rows) {
+    const i = buckets.indexOf(r.hour.includes("T") ? r.hour : r.hour.replace(" ", "T") + "Z");
+    if (i >= 0) values[i] += r.n;
+  }
+  return values;
+}
+
+export function usageTrend(rows: PosthogRow[], days: number, nowMs: number, timeZone: string): ChartSpec | null {
+  const b = makeBuckets(days, nowMs, timeZone);
+  const product = rows.filter((r) => PRODUCT_EVENTS.has(r.event));
+  const series: ChartSeries[] = [
+    { key: "core", name: "Core", color: "series1", values: sumBy(b, product.filter((r) => r.app === "core")) },
+    { key: "reporting", name: "Reporting", color: "series2", values: sumBy(b, product.filter((r) => r.app === "reporting")) },
+  ];
+  if (!series.some((s) => s.values.some(Boolean))) return null;
+  return {
+    id: "usage_trend",
+    kind: "grouped",
+    title: `Product activity per ${b.unit}`,
+    subtitle: `${windowNote(days, b.unit, timeZone)} · page views, navigation, reports, create · PostHog`,
+    categories: b.labels,
+    series,
+    unit: "events",
+    sample: false,
+  };
+}
+
+export function bffHealth(rows: PosthogRow[], days: number, nowMs: number, timeZone: string): ChartSpec | null {
+  const b = makeBuckets(days, nowMs, timeZone);
+  const bff = rows.filter((r) => r.event === "bff_status");
+  const series: ChartSeries[] = [
+    { key: "connected", name: "Connected", color: "good", values: sumBy(b, bff.filter((r) => r.connected === "true")) },
+    { key: "disconnected", name: "Not connected", color: "critical", values: sumBy(b, bff.filter((r) => r.connected === "false")) },
+  ];
+  if (!series.some((s) => s.values.some(Boolean))) return null;
+  return {
+    id: "bff_health",
+    kind: "stacked",
+    title: `BFF connection checks per ${b.unit}`,
+    subtitle: `${windowNote(days, b.unit, timeZone)} · Core + Reporting · PostHog bff_status`,
+    categories: b.labels,
+    series,
+    unit: "checks",
+    sample: false,
+  };
+}
+
 export function buildCharts(plan: RetrievalPlan, inputs: ChartInputs, nowMs: number, timeZone: string, bugsOnly: boolean): ChartSpec[] {
   const charts: Array<ChartSpec | null> = plan.charts.map((kind) => {
     switch (kind) {
@@ -191,6 +245,10 @@ export function buildCharts(plan: RetrievalPlan, inputs: ChartInputs, nowMs: num
         return inputs.activity ? openedVsClosed(inputs.activity, plan.sinceDays, nowMs, timeZone, bugsOnly, inputs.sample.linear) : null;
       case "ci_history":
         return inputs.runs ? ciHistory(inputs.runs, plan.sinceDays, nowMs, timeZone, plan.checkName, inputs.sample.github) : null;
+      case "usage_trend":
+        return inputs.posthog ? usageTrend(inputs.posthog, plan.sinceDays, nowMs, timeZone) : null;
+      case "bff_health":
+        return inputs.posthog ? bffHealth(inputs.posthog, plan.sinceDays, nowMs, timeZone) : null;
     }
   });
   return charts.filter((c): c is ChartSpec => c !== null);

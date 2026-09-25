@@ -25,7 +25,7 @@ import {
   type GithubWorkflowRun,
 } from "./github.js";
 import { fetchLinearActivity, fetchLinearIssues, fetchLinearRecent, normalizeLinearIssue, type LinearActivityNode, type LinearDeps, type LinearIssueNode } from "./linear.js";
-import { samplePosthogInsight } from "./posthog.js";
+import { fetchPosthogActivity, normalizePosthogActivity, samplePosthogInsight, type PosthogRow } from "./posthog.js";
 import { buildCharts, describeChart, type ChartInputs, type CiRunPoint } from "../charts.js";
 import { CONTEXT_CHAR_BUDGET, dedupe, packContext, rankItems } from "./rank.js";
 import type { RetrievalPlan } from "./router.js";
@@ -245,6 +245,7 @@ export async function runRetrieval(plan: RetrievalPlan, config: Config, deps: Re
   const cache = deps.cache ?? retrievalCache;
   const now = deps.now ?? Date.now;
   const { linear, github, allowFixtures } = config;
+  const depsFetch = deps.fetch;
 
   const linearLiveSource = linear.apiKey ? liveLinear({ apiKey: linear.apiKey, fetch: deps.fetch, teamId: linear.teamId, teamKey: linear.teamKey }, cache) : null;
   const githubLiveSource = github.token ? liveGithub({ token: github.token, fetch: deps.fetch }, cache) : null;
@@ -255,9 +256,21 @@ export async function runRetrieval(plan: RetrievalPlan, config: Config, deps: Re
     runConnector("linear", linearLive, allowFixtures ? () => collectLinear(sampleLinear, plan) : null, now),
     runConnector("github", githubLive, allowFixtures ? () => collectGithub(sampleGithub, plan, github.branch, now()) : null, now),
   ];
+  // PostHog rows feed both the summary item and the usage/BFF charts.
+  let posthogRows: PosthogRow[] | undefined;
   if (plan.wantsPosthog) {
     const nowIso = new Date(now()).toISOString();
-    tasks.push(runConnector("posthog", null, allowFixtures ? async () => [samplePosthogInsight(nowIso)] : null, now));
+    const ph = config.posthog;
+    const days = plan.charts.length ? plan.sinceDays : Math.max(plan.sinceDays, 14);
+    const posthogLive =
+      ph.apiKey && ph.projectId
+        ? async () => {
+            const deps = { apiKey: ph.apiKey!, projectId: ph.projectId!, host: ph.host, fetch: depsFetch };
+            posthogRows = await cache.getOrLoad(`posthog:activity:${ph.projectId}:${days}`, CACHE_TTL_MS.githubPrs, () => fetchPosthogActivity(days, deps));
+            return [normalizePosthogActivity(posthogRows, days, deps, nowIso)];
+          }
+        : null;
+    tasks.push(runConnector("posthog", posthogLive, allowFixtures ? async () => [samplePosthogInsight(nowIso)] : null, now));
   }
 
   const results = await Promise.all(tasks);
@@ -278,7 +291,7 @@ export async function runRetrieval(plan: RetrievalPlan, config: Config, deps: Re
       now(),
     );
     const bugsOnly = plan.keywords.some((k) => /^bugs?$/.test(k));
-    charts = buildCharts(plan, { items: allItems, ...extra, sample: { linear: modes.linear === "sample", github: modes.github === "sample" } }, now(), config.timeZone, bugsOnly);
+    charts = buildCharts(plan, { items: allItems, ...extra, posthog: posthogRows, sample: { linear: modes.linear === "sample", github: modes.github === "sample" } }, now(), config.timeZone, bugsOnly);
   }
   const chartText = charts.map(describeChart).join("\n");
   const counts = [chartText, linearCounts(allItems, plan.sinceDays, now()), githubCounts(allItems, plan.sinceDays, now())].filter(Boolean).join("\n\n") || null;

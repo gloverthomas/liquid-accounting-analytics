@@ -20,10 +20,12 @@ All connectors are **read-only** and run on the server only. The browser never t
   - `GET /repos/{repo}/commits/{branch}/check-runs`, keeping the latest run of each check name. Expected names are `build`, `assistant-unit`, `smoke` and `parity-proof` on Core, and `build`, `assistant-unit` and `help-proof` on Reporting.
 - **Not fetched:** diffs, file contents and binary assets. PR descriptions are clipped to 240 characters.
 
-## PostHog (sample only in MVP)
+## PostHog (`server/retrieval/posthog.ts`)
 
-- For trend questions, the app adds one pre-aggregated **sample** insight (`server/retrieval/posthog.ts`).
-- Live PostHog is planned for v2 and will use allowlisted, aggregated insights only: no raw events and no PII.
+- **Auth:** `POSTHOG_PERSONAL_API_KEY` (read-only query scope) and `POSTHOG_PROJECT_ID`. `POSTHOG_HOST` must be `us`, `eu` or `app.posthog.com`; any other value falls back to US, so the key can't be sent elsewhere.
+- **Query:** one fixed HogQL query that counts events per hour, per event and per app. It only covers the allowlisted events (`$pageview`, `product_navigation`, `report_opened`, `bff_status`, `create_dialog_opened`, `invoice_deep_link_miss`) and never selects person, token or distinct-id fields. The window is clamped to 30 days, and no user text is ever interpolated into the query.
+- **Output:** an aggregate summary item that leads with what **isn't** tracked (AI Assistant usage), plus the "Product activity" and "BFF connection checks" charts.
+- **Without keys:** falls back to the sample insight.
 
 ## Sentry, code search
 

@@ -6,7 +6,7 @@
 export type Intent = "issue_status" | "ci_health" | "trend" | "problems" | "merged_prs" | "linear_overview" | "general";
 
 /** Server-computed charts a question can ask for. */
-export type ChartKind = "prs_per_day" | "tickets_by_state" | "opened_vs_closed" | "ci_history";
+export type ChartKind = "prs_per_day" | "tickets_by_state" | "opened_vs_closed" | "ci_history" | "usage_trend" | "bff_health";
 
 /** "overview" = narrative summary + key items; "direct" = short answer to a specific question. */
 export type AnswerStyle = "overview" | "direct";
@@ -45,6 +45,11 @@ const TICKET_NOUNS = /\b(tickets?|bugs?|issues?|defects?)\b/i;
 const OPEN_CLOSE = /\b(open(ed|ing)?|creat(ed|ing)|new|clos(e|ed|ing)|resolv(e|ed|ing)|fix(ed|ing)?)\b/i;
 const COMPARE = /\b(vs\.?|versus|than|faster|slower|rate|keeping up|outpac\w*|backlog growing)\b/i;
 const CI_HISTORY = /\b(how often|fail(ed|s|ures?)?|pass rate|flaky|history|over time|trends?|per day|daily|this week|last \d+ (days?|weeks?))\b/i;
+const PRODUCT_WORDS = /\b(usage|adoption|users?|traffic|page ?views?|visits?|engagement|posthog|product analytics|navigation|active|activity in the apps?)\b/i;
+const BFF_WORDS = /\b(bff|connect(ed|ion|ivity)?|disconnect(ed|s)?|offline|outage|backend status)\b/i;
+const GOING = /\b(going up|going down|growing|dropping|increas\w*|decreas\w*|up or down|chang(e|ed|ing))\b/i;
+/** CI named outright (not just "checks", which BFF questions also use). */
+const EXPLICIT_CI = /\b(ci|builds?|assistant-unit|smoke|parity-proof|help-proof|pipelines?|github actions|workflow runs?)\b/i;
 const CHECK_NAMES = ["assistant-unit", "parity-proof", "help-proof", "smoke", "build"];
 
 function pickCharts(message: string, intent: Intent, linearStates: string[]): ChartKind[] {
@@ -55,7 +60,10 @@ function pickCharts(message: string, intent: Intent, linearStates: string[]): Ch
     charts.push("tickets_by_state");
   }
   if (TICKET_NOUNS.test(message) && OPEN_CLOSE.test(message) && COMPARE.test(message)) charts.push("opened_vs_closed");
-  if ((intent === "ci_health" || CI_WORDS.test(message)) && CI_HISTORY.test(message)) charts.push("ci_history");
+  const bffQuestion = BFF_WORDS.test(message);
+  if ((intent === "ci_health" || CI_WORDS.test(message)) && CI_HISTORY.test(message) && (!bffQuestion || EXPLICIT_CI.test(message))) charts.push("ci_history");
+  if (PRODUCT_WORDS.test(message) && (wantsChart || GOING.test(message) || intent === "trend")) charts.push("usage_trend");
+  if (BFF_WORDS.test(message) && (wantsChart || GOING.test(message) || /\bhow often|errors?|failing\b/i.test(message))) charts.push("bff_health");
   return charts;
 }
 
@@ -128,7 +136,7 @@ export function planRetrieval(message: string, configuredRepos: string[]): Retri
     repos: pickRepos(lower, configuredRepos),
     sinceDays: windowDays(lower),
     wantsChecks: intent === "ci_health" || intent === "problems" || intent === "general" || CI_WORDS.test(message),
-    wantsPosthog: intent === "trend",
+    wantsPosthog: intent === "trend" || PRODUCT_WORDS.test(message) || BFF_WORDS.test(message),
     keywords: extractKeywords(lower),
     style: ["problems", "trend", "general"].includes(intent) || OVERVIEW_WORDS.test(message) ? "overview" : "direct",
     charts: pickCharts(message, intent, linearStates),
