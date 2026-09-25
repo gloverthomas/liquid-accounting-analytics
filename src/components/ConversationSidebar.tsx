@@ -1,4 +1,4 @@
-import { MessageSquare, Trash2, X } from "lucide-react";
+import { MessageSquare, PanelLeftClose, Trash2 } from "lucide-react";
 import { useEffect } from "react";
 import { useNow } from "../hooks/useNow";
 import { relativeTime, type Conversation } from "../lib/conversationStore";
@@ -8,12 +8,15 @@ interface ConversationSidebarProps {
   activeId: string;
   onSelect: (id: string) => void;
   onDelete: (id: string) => void;
-  /** Drawer state on small screens; ignored on desktop where the sidebar is always shown. */
+  /** Drawer state on small screens. */
   open: boolean;
+  /** Closes the drawer (Esc, backdrop, picking a chat). */
   onClose: () => void;
+  /** The collapse button next to "Recent": collapses on desktop, closes the drawer on phones. */
+  onHide: () => void;
 }
 
-export function ConversationSidebar({ conversations, activeId, onSelect, onDelete, open, onClose }: ConversationSidebarProps) {
+export function ConversationSidebar({ conversations, activeId, onSelect, onDelete, open, onClose, onHide }: ConversationSidebarProps) {
   useEffect(() => {
     if (!open) return;
     const onKey = (event: KeyboardEvent) => event.key === "Escape" && onClose();
@@ -29,8 +32,8 @@ export function ConversationSidebar({ conversations, activeId, onSelect, onDelet
       <aside id="history" className="sidebar" data-open={open} aria-label="Chat history">
         <div className="sidebar-head">
           <h2 className="section-label">Recent</h2>
-          <button type="button" className="icon-button sidebar-close" onClick={onClose} aria-label="Close history">
-            <X size={16} aria-hidden="true" />
+          <button type="button" className="icon-button sidebar-collapse" onClick={onHide} aria-label="Hide chat history" title="Hide chat history">
+            <PanelLeftClose size={16} aria-hidden="true" />
           </button>
         </div>
         {conversations.length ? (

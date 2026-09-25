@@ -75,6 +75,21 @@ describe("App", () => {
     expect(within(history).getByText(/saved in this browser only/)).toBeInTheDocument();
   });
 
+  it("collapses and reopens the history sidebar, remembering the choice", async () => {
+    route({ "/api/v1/orgs": () => jsonRes(ORGS), "/api/v1/suggested-prompts": () => jsonRes(PROMPTS) });
+    const { container, unmount } = render(<App />);
+    await userEvent.click(await screen.findByRole("button", { name: "Hide chat history" }));
+    expect(container.querySelector(".shell")).toHaveAttribute("data-sidebar", "collapsed");
+    expect(localStorage.getItem("liquid-insights:sidebar-collapsed")).toBe("1");
+    unmount();
+
+    const again = render(<App />);
+    await screen.findByRole("heading", { name: /What do you want to know/ });
+    expect(again.container.querySelector(".shell")).toHaveAttribute("data-sidebar", "collapsed");
+    await userEvent.click(screen.getByRole("button", { name: "Show chat history" }));
+    expect(again.container.querySelector(".shell")).toHaveAttribute("data-sidebar", "expanded");
+  });
+
   it("offers to re-ask a question that was saved without an answer", async () => {
     localStorage.setItem(
       "liquid-insights:conversations:v1",

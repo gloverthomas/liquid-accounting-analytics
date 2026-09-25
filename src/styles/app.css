@@ -66,7 +66,12 @@ a { color: inherit; }
   transition: background var(--duration-fast) ease, color var(--duration-fast) ease;
 }
 .icon-button:hover { background: rgba(22, 24, 29, 0.06); color: var(--color-ink); }
-.menu-button, .sidebar-close { display: none; }
+.menu-button { display: none; }
+/* Desktop: collapsing hides the column and brings back the top-bar button to reopen it. */
+@media (min-width: 900px) {
+  .shell[data-sidebar="collapsed"] .sidebar { display: none; }
+  .shell[data-sidebar="collapsed"] .menu-button { display: inline-grid; }
+}
 
 .new-chat {
   display: inline-flex; align-items: center; gap: var(--space-2); flex: 0 0 auto;
@@ -88,7 +93,8 @@ a { color: inherit; }
   overflow-y: auto; padding: var(--space-4) var(--space-3);
   border-right: 1px solid var(--color-rule); background: color-mix(in srgb, var(--color-paper) 70%, #fff);
 }
-.sidebar-head { display: flex; align-items: center; justify-content: space-between; padding: 0 var(--space-2) var(--space-2); }
+.sidebar-head { display: flex; align-items: center; justify-content: space-between; margin-top: -6px; padding: 0 0 var(--space-2) var(--space-2); }
+.sidebar-collapse { width: 30px; height: 30px; }
 .sidebar-head .section-label { margin: 0; }
 .history-list { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
 .history-item { position: relative; display: flex; align-items: center; border-radius: var(--radius-sm); }
@@ -301,7 +307,7 @@ a { color: inherit; }
 
 /* ─── Responsive ───────────────────────────────────────── */
 @media (max-width: 899px) {
-  .menu-button, .sidebar-close { display: inline-grid; }
+  .menu-button { display: inline-grid; }
   .sidebar {
     position: fixed; top: 0; left: 0; z-index: 30; height: 100dvh; width: min(84vw, 300px); flex: none;
     background: var(--color-paper); box-shadow: 0 0 48px rgba(22, 24, 29, 0.18);

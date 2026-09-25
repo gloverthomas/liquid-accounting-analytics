@@ -7,6 +7,7 @@ import { ConversationSidebar } from "./components/ConversationSidebar";
 import { Composer } from "./components/Composer";
 import { InsightsHero } from "./components/InsightsHero";
 import { useConversations, type ConversationsApi } from "./hooks/useConversations";
+import { useSidebar } from "./hooks/useSidebar";
 import { abortConversation, useInsightsChat } from "./hooks/useInsightsChat";
 import { api, ApiRequestError } from "./lib/api";
 
@@ -111,8 +112,7 @@ function Workspace({ orgs, prompts }: { orgs: Organisation[]; prompts: Suggested
   // Single-org MVP: scope chat to the default org.
   const orgId = orgs[0]?.id;
   const history = useConversations();
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const closeDrawer = useCallback(() => setDrawerOpen(false), []);
+  const sidebar = useSidebar();
   const { activeId, remove } = history;
   const isFresh = history.entriesOf(activeId).length === 0;
   const deleteConversation = useCallback(
@@ -124,15 +124,16 @@ function Workspace({ orgs, prompts }: { orgs: Organisation[]; prompts: Suggested
   );
 
   return (
-    <div className="shell">
+    <div className="shell" data-sidebar={sidebar.collapsed ? "collapsed" : "expanded"}>
       <header className="topbar">
         <div className="topbar-start">
           <button
             type="button"
             className="icon-button menu-button"
-            onClick={() => setDrawerOpen(true)}
-            aria-label="Open chat history"
-            aria-expanded={drawerOpen}
+            onClick={sidebar.show}
+            aria-label="Show chat history"
+            title="Show chat history"
+            aria-expanded={sidebar.drawerOpen}
             aria-controls="history"
           >
             <PanelLeft size={18} aria-hidden="true" />
@@ -156,8 +157,9 @@ function Workspace({ orgs, prompts }: { orgs: Organisation[]; prompts: Suggested
           activeId={activeId}
           onSelect={history.select}
           onDelete={deleteConversation}
-          open={drawerOpen}
-          onClose={closeDrawer}
+          open={sidebar.drawerOpen}
+          onClose={sidebar.closeDrawer}
+          onHide={sidebar.hide}
         />
         <ChatPane key={activeId} orgId={orgId} prompts={prompts} conversationId={activeId} store={history} />
       </div>
