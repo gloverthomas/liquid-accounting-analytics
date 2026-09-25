@@ -70,7 +70,11 @@ a { color: inherit; }
 .sidebar-expand { display: none; }
 /* Desktop: collapsing shrinks the column to a slim rail; the toggle stays where it was. */
 @media (min-width: 900px) {
-  .shell[data-sidebar="collapsed"] .sidebar { width: var(--rail-width); flex-basis: var(--rail-width); padding-left: 0; padding-right: 0; overflow: hidden; }
+  .shell[data-sidebar="collapsed"] .sidebar {
+    width: var(--rail-width); flex-basis: var(--rail-width); padding-left: 0; padding-right: 0; overflow: hidden;
+    /* Collapsed rail sits on the page itself; the panel surface only appears when expanded. */
+    background: transparent; border-right-color: transparent;
+  }
   .shell[data-sidebar="collapsed"] .sidebar-head { justify-content: center; padding-left: 0; }
   .shell[data-sidebar="collapsed"] .sidebar-head .section-label,
   .shell[data-sidebar="collapsed"] .sidebar-collapse,
