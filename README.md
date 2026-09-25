@@ -34,6 +34,7 @@ With no keys it runs in **sample mode**: realistic LIQ-24 demo data and canned a
 | `LIQUID_BFF_DEMO_TOKEN` | Local dev auth | Injected by the Vite proxy; never in the bundle |
 | `LIQUID_INSIGHTS_ACCESS_CODE` / `LIQUID_SESSION_SECRET` | **Hosted auth** | Required on Vercel, or every API route returns 503 |
 | `POSTHOG_PERSONAL_API_KEY` / `POSTHOG_PROJECT_ID` / `POSTHOG_HOST` | Live product analytics | Read-only key; host must be us/eu/app.posthog.com |
+| `POSTHOG_PROJECT_TOKEN` | Insights question log | Public `phc_` token; categories only, never question text |
 | `LINEAR_ACTIONS_API_KEY` | Ticket moves | A **separate** Linear key with write access; without it the app stays read-only |
 
 The full list is in [`.env.example`](.env.example). If a key is set but that service fails, the answer marks it "unavailable" rather than quietly switching to sample data.
@@ -73,6 +74,16 @@ Some questions come back with a chart above the sources:
 - **Colours are validated for colour blindness** with the dataviz checker: blue/orange for comparisons, green/red reserved for passed/failed.
 - **Each chart has a legend, a hover tooltip and a "Show data" table,** so no information is conveyed by colour alone.
 - **Product activity and BFF health charts come from PostHog,** using fixed aggregate queries over the same event and property allowlist the apps send (no raw events, no personal data, no user text in queries). AI Assistant usage **isn't tracked** in PostHog yet, and answers say so.
+
+## "What have people been asking?"
+
+Every answered question is logged to PostHog as one `insights_question` event holding **categories only**: topic (ticket status, CI health, merged PRs, problems, product usage, ticket moves…), answer style, charts shown, sources used, answer type (Grok, sample, source list, ticket move), outcome (answered, fell back, error), speed, and an anonymous hash of the session. **The question text, ticket ids and anything typed are never recorded** (a test enforces this).
+
+Ask Insights "What have people been asking this week?", "How are people using Insights?" or "What are the most common questions?" to get an overview plus two charts: questions by topic, and questions per day (answered vs fell back).
+
+- Writing uses `POSTHOG_PROJECT_TOKEN` (the public `phc_` token); reading uses the personal key.
+- Because the token is public, look-alike events are possible, so only known topics, answer types and outcomes are counted.
+- E2E and CI blank these keys so test runs never pollute the log.
 
 ## Ticket moves
 

@@ -4,12 +4,15 @@
  */
 import { HISTORY_MAX_TURNS, MESSAGE_MAX_CHARS, MESSAGE_MIN_CHARS, type ChatResponse, type ChatTurn } from "../shared/contracts.js";
 import { ActionError, executeTransition } from "./actions/linearTransition.js";
-import { accessCodeMatches, authenticate, buildSessionCookie, createSessionToken } from "./auth.js";
+import { accessCodeMatches, authenticate, buildSessionCookie, createSessionToken, sessionCookieName } from "./auth.js";
 import { sessionAuthEnabled, type Config } from "./config.js";
 import { createXaiClient, type GrokClient } from "./grok/client.js";
-import { BodyError, errorResponse, json, noContent, readJsonBody, type RequestContext } from "./http.js";
+import { BodyError, errorResponse, json, noContent, parseCookies, readJsonBody, type RequestContext } from "./http.js";
 import { answerQuestion } from "./insights.js";
 import { progressSteps } from "./progress.js";
+import { detectTicketAction } from "./actions/linearTransition.js";
+import { planRetrieval } from "./retrieval/router.js";
+import { anonymousViewerId, recordQuestion, type QuestionRecord } from "./telemetry.js";
 import { errorCode, logEvent } from "./log.js";
 import { ORGS, DEFAULT_ORG, SUGGESTED_PROMPTS } from "./org.js";
 import { RATE_LIMITS, RateLimiter } from "./rateLimit.js";
@@ -48,12 +51,19 @@ function originAllowed(request: Request, config: Config): boolean {
   return hosts.some((host) => origin === `https://${host}` || (!config.isProductionLike && origin === `http://${host}`));
 }
 
+/** Hash of the session cookie (or "local-dev" for the proxy bearer) — anonymous, never the cookie itself. */
+function viewerIdFor(request: Request, config: Config): string {
+  const session = parseCookies(request.headers.get("cookie"))[sessionCookieName(config)];
+  return anonymousViewerId(session ?? "local-dev");
+}
+
 function connectorFlags(config: Config) {
   return {
     grok: Boolean(config.xai.apiKey),
     linear: Boolean(config.linear.apiKey),
     github: Boolean(config.github.token),
     posthog: Boolean(config.posthog.apiKey && config.posthog.projectId),
+    questionLog: Boolean(config.posthog.projectToken),
     sentry: false,
     fixtures: config.allowFixtures,
     actions: Boolean(config.actions.linearApiKey),
@@ -84,8 +94,35 @@ export function createApp(deps: AppDeps): AppHandler {
     }
 
     const started = now();
-    const answer = await answerQuestion(message, sanitizeHistory(body.history), config, { fetch: fetchImpl, grok, now, requestId: ctx.requestId });
+    const action = detectTicketAction(message);
+    const plan = planRetrieval(message, config.github.repos);
+    const record = (answer: Omit<QuestionRecord, "topic" | "style" | "charts" | "windowDays">): Promise<void> =>
+      recordQuestion(config, fetchImpl, viewerIdFor(request, config), {
+        topic: action ? "ticket_move" : plan.intent,
+        style: action ? "action" : plan.style,
+        charts: action ? [] : plan.charts,
+        windowDays: plan.sinceDays,
+        ...answer,
+      });
+
+    let answer: Awaited<ReturnType<typeof answerQuestion>>;
+    try {
+      answer = await answerQuestion(message, sanitizeHistory(body.history), config, { fetch: fetchImpl, grok, now, requestId: ctx.requestId });
+    } catch (error) {
+      await record({ sources: [], answerType: "none", outcome: "error", latencyMs: now() - started, citationCount: 0 });
+      throw error;
+    }
     const latencyMs = now() - started;
+    const answerType = answer.provider.startsWith("grok:") ? "grok" : (answer.provider as "fixture" | "digest" | "action");
+    await record({
+      sources: Object.entries(answer.retrievalMeta.connectorModes)
+        .filter(([, mode]) => mode !== "unavailable")
+        .map(([c]) => c),
+      answerType,
+      outcome: answerType === "digest" ? "fallback" : "answered",
+      latencyMs,
+      citationCount: answer.citations.length,
+    });
     logEvent("insights_chat", {
       requestId: ctx.requestId,
       provider: answer.provider,

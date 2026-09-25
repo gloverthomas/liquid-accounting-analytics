@@ -20,7 +20,8 @@ export interface Config {
   github: { token: string | null; repos: string[]; branch: string };
   /** IANA zone for day/week chart buckets. */
   timeZone: string;
-  posthog: { apiKey: string | null; projectId: string | null; host: string };
+  /** apiKey = personal key (read queries); projectToken = public phc_ token (writes the question log). */
+  posthog: { apiKey: string | null; projectId: string | null; host: string; projectToken: string | null };
 }
 
 type Env = Record<string, string | undefined>;
@@ -119,6 +120,7 @@ export function loadConfig(env: Env = process.env): Config {
       apiKey: str(env, "POSTHOG_PERSONAL_API_KEY"),
       projectId: /^\d{1,12}$/.test(str(env, "POSTHOG_PROJECT_ID") ?? "") ? str(env, "POSTHOG_PROJECT_ID") : null,
       host: parsePosthogHost(str(env, "POSTHOG_HOST")),
+      projectToken: /^phc_[A-Za-z0-9_-]{20,}$/.test(str(env, "POSTHOG_PROJECT_TOKEN") ?? "") ? str(env, "POSTHOG_PROJECT_TOKEN") : null,
     },
   };
 }

@@ -11,6 +11,10 @@ const E2E_ENV = {
   XAI_API_KEY: "",
   LINEAR_API_KEY: "",
   GITHUB_TOKEN: "",
+  // Never write test questions into the real question log.
+  POSTHOG_PROJECT_TOKEN: "",
+  POSTHOG_PERSONAL_API_KEY: "",
+  LINEAR_ACTIONS_API_KEY: "",
 };
 
 export default defineConfig({

@@ -25,6 +25,7 @@ import {
   type GithubWorkflowRun,
 } from "./github.js";
 import { fetchLinearActivity, fetchLinearIssues, fetchLinearRecent, normalizeLinearIssue, type LinearActivityNode, type LinearDeps, type LinearIssueNode } from "./linear.js";
+import { fetchQuestionLog, normalizeQuestionLog, questionTopicsChart, questionsPerDayChart, type QuestionLog } from "./insightsUsage.js";
 import { fetchPosthogActivity, normalizePosthogActivity, samplePosthogInsight, type PosthogRow } from "./posthog.js";
 import { buildCharts, describeChart, type ChartInputs, type CiRunPoint } from "../charts.js";
 import { CONTEXT_CHAR_BUDGET, dedupe, packContext, rankItems } from "./rank.js";
@@ -241,7 +242,38 @@ async function runConnector(
   return { connector, mode: "unavailable", fetchedAt, items: [] };
 }
 
+/** "What have people been asking?" reads only the question log — Linear/GitHub would be noise. */
+async function runInsightsUsage(plan: RetrievalPlan, config: Config, deps: RetrievalDeps, cache: TtlCache, now: () => number): Promise<RetrievalOutcome> {
+  const ph = config.posthog;
+  const days = plan.sinceDays;
+  const fetchedAt = new Date(now()).toISOString();
+  let log: QuestionLog | null = null;
+  let mode: ConnectorMode = "unavailable";
+  if (ph.apiKey && ph.projectId) {
+    const phDeps = { apiKey: ph.apiKey, projectId: ph.projectId, host: ph.host, fetch: deps.fetch };
+    try {
+      log = await cache.getOrLoad(`posthog:questions:${ph.projectId}:${days}`, CACHE_TTL_MS.linearList, () => fetchQuestionLog(days, phDeps));
+      mode = "live";
+    } catch (error) {
+      logEvent("connector_error", { connectors: ["posthog"], connector_error: errorCode(error) });
+    }
+  }
+  const items = log && ph.projectId ? [normalizeQuestionLog(log, days, { host: ph.host, projectId: ph.projectId }, fetchedAt)] : [];
+  const charts = log
+    ? [questionTopicsChart(log, days), questionsPerDayChart(log, days, now(), config.timeZone)].filter((c): c is ChartSpec => c !== null)
+    : [];
+  const unavailable = mode === "unavailable" ? "INSIGHTS QUESTION LOG UNAVAILABLE: PostHog isn't configured or didn't respond, so usage of Insights can't be measured right now.\n" : "";
+  return {
+    results: [{ connector: "posthog", mode, fetchedAt, items }],
+    context: `${unavailable}${charts.map(describeChart).join("\n")}${charts.length ? "\n\n" : ""}${items.map((i) => i.text).join("\n")}`,
+    items,
+    meta: { connectors: ["posthog"], connectorModes: { posthog: mode }, window: `last ${days} days`, truncated: false, itemCount: items.length },
+    charts,
+  };
+}
+
 export async function runRetrieval(plan: RetrievalPlan, config: Config, deps: RetrievalDeps): Promise<RetrievalOutcome> {
+  if (plan.intent === "insights_usage") return runInsightsUsage(plan, config, deps, deps.cache ?? retrievalCache, deps.now ?? Date.now);
   const cache = deps.cache ?? retrievalCache;
   const now = deps.now ?? Date.now;
   const { linear, github, allowFixtures } = config;

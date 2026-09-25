@@ -13,6 +13,8 @@ env:
   XAI_API_KEY: ""
   LINEAR_API_KEY: ""
   GITHUB_TOKEN: ""
+  POSTHOG_PROJECT_TOKEN: ""
+  POSTHOG_PERSONAL_API_KEY: ""
 
 jobs:
   build:

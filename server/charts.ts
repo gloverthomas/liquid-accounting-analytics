@@ -271,6 +271,9 @@ export function buildCharts(plan: RetrievalPlan, inputs: ChartInputs, nowMs: num
         return inputs.posthog ? bffHealth(inputs.posthog, plan.sinceDays, nowMs, timeZone) : null;
       case "assistant_usage":
         return inputs.posthog ? assistantUsage(inputs.posthog, plan.sinceDays, nowMs, timeZone) : null;
+      case "insights_topics":
+      case "insights_daily":
+        return null; // built by the question-log path (retrieval/insightsUsage.ts)
     }
   });
   return charts.filter((c): c is ChartSpec => c !== null);

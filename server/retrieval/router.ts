@@ -3,10 +3,10 @@
  * hit, for which repos, over what window.
  */
 
-export type Intent = "issue_status" | "ci_health" | "trend" | "problems" | "merged_prs" | "linear_overview" | "general";
+export type Intent = "insights_usage" | "issue_status" | "ci_health" | "trend" | "problems" | "merged_prs" | "linear_overview" | "general";
 
 /** Server-computed charts a question can ask for. */
-export type ChartKind = "prs_per_day" | "tickets_by_state" | "opened_vs_closed" | "ci_history" | "usage_trend" | "bff_health" | "assistant_usage";
+export type ChartKind = "prs_per_day" | "tickets_by_state" | "opened_vs_closed" | "ci_history" | "usage_trend" | "bff_health" | "assistant_usage" | "insights_topics" | "insights_daily";
 
 /** "overview" = narrative summary + key items; "direct" = short answer to a specific question. */
 export type AnswerStyle = "overview" | "direct";
@@ -40,6 +40,16 @@ const TREND_WORDS = /\b(trends?|trending|increasing|decreasing|over time|per wee
 const MERGE_WORDS = /\b(merged?|shipped|pull requests?|prs?|delivery|released|landed)\b/i;
 const LINEAR_WORDS = /\b(tickets?|bugs?|issues?|todo|backlog|in progress|in review|done|blocked|blocking|linear|defects?|status)\b/i;
 
+/** Questions about Liquid Insights itself: "what have people been asking?", "how is the team using Insights?". */
+const META_USAGE = [
+  /\b(people|users?|team|everyone|anyone|folks|viewers?)\b[^.?]*\bask(ed|ing|s)?\b/i,
+  /\b(questions?|queries)\b[^.?]*\b(asked|asking|people|users?|team|everyone|popular|common)\b/i,
+  /\bmost (common|popular|frequent|asked)\b[^.?]*\b(questions?|queries|topics?)\b/i,
+  /\b(using|use|usage of|used)\b[^.?]*\b(insights|this (tool|bot|app|chat))\b/i,
+  /\b(insights|this (tool|bot|app|chat))\b[^.?]*\b(usage|used|adoption)\b/i,
+];
+export const isInsightsUsageQuestion = (message: string) => META_USAGE.some((re) => re.test(message));
+
 const CHART_WORDS = /\b(charts?|graphs?|plot|visuali[sz]e|per day|per week|daily|weekly|over time|trends?|breakdown|by (status|state)|history|how often|each day|each week)\b/i;
 const TICKET_NOUNS = /\b(tickets?|bugs?|issues?|defects?)\b/i;
 const OPEN_CLOSE = /\b(open(ed|ing)?|creat(ed|ing)|new|clos(e|ed|ing)|resolv(e|ed|ing)|fix(ed|ing)?)\b/i;
@@ -53,6 +63,7 @@ const EXPLICIT_CI = /\b(ci|builds?|assistant-unit|smoke|parity-proof|help-proof|
 const CHECK_NAMES = ["assistant-unit", "parity-proof", "help-proof", "smoke", "build"];
 
 function pickCharts(message: string, intent: Intent, linearStates: string[]): ChartKind[] {
+  if (intent === "insights_usage") return ["insights_topics", "insights_daily"];
   const charts: ChartKind[] = [];
   const wantsChart = CHART_WORDS.test(message);
   if (MERGE_WORDS.test(message) && (wantsChart || /\bhow many\b/i.test(message))) charts.push("prs_per_day");
@@ -114,6 +125,7 @@ function extractKeywords(lower: string): string[] {
 }
 
 function classify(message: string, hasIssueIds: boolean, namesStates: boolean): Intent {
+  if (isInsightsUsageQuestion(message)) return "insights_usage";
   if (hasIssueIds) return "issue_status";
   if (TREND_WORDS.test(message)) return "trend";
   if (CI_WORDS.test(message)) return "ci_health";
@@ -138,9 +150,9 @@ export function planRetrieval(message: string, configuredRepos: string[]): Retri
     repos: pickRepos(lower, configuredRepos),
     sinceDays: windowDays(lower),
     wantsChecks: intent === "ci_health" || intent === "problems" || intent === "general" || CI_WORDS.test(message),
-    wantsPosthog: intent === "trend" || PRODUCT_WORDS.test(message) || BFF_WORDS.test(message),
+    wantsPosthog: intent === "insights_usage" || intent === "trend" || PRODUCT_WORDS.test(message) || BFF_WORDS.test(message),
     keywords: extractKeywords(lower),
-    style: ["problems", "trend", "general"].includes(intent) || OVERVIEW_WORDS.test(message) ? "overview" : "direct",
+    style: ["problems", "trend", "general", "insights_usage"].includes(intent) || OVERVIEW_WORDS.test(message) ? "overview" : "direct",
     charts: pickCharts(message, intent, linearStates),
     checkName: CHECK_NAMES.find((name) => new RegExp(`\\b${name}\\b`, "i").test(message)) ?? null,
   };

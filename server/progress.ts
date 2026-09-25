@@ -15,6 +15,8 @@ const CHART_NAMES: Record<ChartKind, string> = {
   usage_trend: "product activity",
   bff_health: "BFF connection health",
   assistant_usage: "AI Assistant messages",
+  insights_topics: "questions by topic",
+  insights_daily: "questions per day",
 };
 
 function list(items: string[]): string {
@@ -31,6 +33,13 @@ export function progressSteps(message: string, config: Config): string[] {
   }
 
   const plan = planRetrieval(message, config.github.repos);
+  if (plan.intent === "insights_usage") {
+    return [
+      "Reading the Insights question log from PostHog (topics only, no question text)…",
+      "Building 2 charts: questions by topic and questions per day…",
+      config.xai.apiKey ? "Asking Grok to write it up…" : "Putting the answer together…",
+    ];
+  }
   const sample = (configured: boolean) => (configured || !config.allowFixtures ? "" : " (sample data)");
   const steps: string[] = [];
 
