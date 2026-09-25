@@ -2,7 +2,7 @@
  * Sample GitHub data (shape = GitHub REST payloads) used when GITHUB_TOKEN is not
  * configured. Titles/numbers mirror the real demo repos; dates are relative.
  */
-import type { GithubCheckRun, GithubPull } from "../retrieval/github.js";
+import type { GithubCheckRun, GithubPull, GithubWorkflowRun } from "../retrieval/github.js";
 import { daysAgo } from "./time.js";
 
 const CORE = "gloverthomas/liquid-accounting-core";
@@ -66,4 +66,19 @@ export function sampleCheckRuns(repo: string): GithubCheckRun[] {
     head_sha: seed.sha,
     completed_at: daysAgo(0.29 - i * 0.001),
   }));
+}
+
+/** One sample CI run per sample merged PR (all green, as the real repos are). */
+export function sampleWorkflowRuns(repo: string): GithubWorkflowRun[] {
+  return samplePulls(repo)
+    .filter((pull) => pull.merged_at)
+    .map((pull) => ({
+      id: pull.number,
+      name: "CI",
+      status: "completed",
+      conclusion: "success",
+      created_at: pull.merged_at!,
+      head_branch: "main",
+      html_url: `https://github.com/${repo}/actions`,
+    }));
 }

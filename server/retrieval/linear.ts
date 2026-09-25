@@ -101,3 +101,25 @@ export function normalizeLinearIssue(node: LinearIssueNode): RetrievedItem {
     labels: node.labels?.nodes.map((l) => l.name) ?? [],
   };
 }
+
+/** Minimal shape for "opened vs closed" charts: when each ticket was created and completed. */
+export interface LinearActivityNode {
+  identifier: string;
+  createdAt: string;
+  completedAt: string | null;
+  labels?: { nodes: Array<{ name: string }> } | null;
+}
+
+const ACTIVITY_LIMIT = 100;
+
+/** Tickets created OR completed since `sinceIso`, for trend charts (not packed into Grok's context). */
+export async function fetchLinearActivity(sinceIso: string, deps: LinearDeps): Promise<LinearActivityNode[]> {
+  const team = deps.teamId ? { team: { id: { eq: deps.teamId } } } : { team: { key: { eq: deps.teamKey } } };
+  const filter = { ...team, or: [{ createdAt: { gte: sinceIso } }, { completedAt: { gte: sinceIso } }] };
+  const query = `query Activity($filter: IssueFilter, $first: Int!) {
+    issues(filter: $filter, first: $first) { nodes { identifier createdAt completedAt labels { nodes { name } } } }
+  }`;
+  const { data, errors } = await graphql<{ issues: { nodes: LinearActivityNode[] } }>(deps, query, { filter, first: ACTIVITY_LIMIT });
+  if (!data?.issues) throw new Error(errors.length ? "linear_graphql_error" : "linear_empty_response");
+  return data.issues.nodes;
+}

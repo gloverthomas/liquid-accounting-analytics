@@ -5,6 +5,9 @@
 
 export type Intent = "issue_status" | "ci_health" | "trend" | "problems" | "merged_prs" | "linear_overview" | "general";
 
+/** Server-computed charts a question can ask for. */
+export type ChartKind = "prs_per_day" | "tickets_by_state" | "opened_vs_closed" | "ci_history";
+
 /** "overview" = narrative summary + key items; "direct" = short answer to a specific question. */
 export type AnswerStyle = "overview" | "direct";
 
@@ -18,6 +21,9 @@ export interface RetrievalPlan {
   wantsPosthog: boolean;
   keywords: string[];
   style: AnswerStyle;
+  charts: ChartKind[];
+  /** A specific check the question names (e.g. "assistant-unit"), for CI history charts. */
+  checkName: string | null;
 }
 
 const DEFAULT_WINDOW_DAYS = 14;
@@ -33,6 +39,25 @@ const OVERVIEW_WORDS = /\b(overview|summary|summari[sz]e|recap|what happened|wha
 const TREND_WORDS = /\b(trends?|trending|increasing|decreasing|over time|per week|week over week|rate|velocity)\b/i;
 const MERGE_WORDS = /\b(merged?|shipped|pull requests?|prs?|delivery|released|landed)\b/i;
 const LINEAR_WORDS = /\b(tickets?|bugs?|issues?|todo|backlog|in progress|in review|done|blocked|blocking|linear|defects?|status)\b/i;
+
+const CHART_WORDS = /\b(charts?|graphs?|plot|visuali[sz]e|per day|per week|daily|weekly|over time|trends?|breakdown|by (status|state)|history|how often|each day|each week)\b/i;
+const TICKET_NOUNS = /\b(tickets?|bugs?|issues?|defects?)\b/i;
+const OPEN_CLOSE = /\b(open(ed|ing)?|creat(ed|ing)|new|clos(e|ed|ing)|resolv(e|ed|ing)|fix(ed|ing)?)\b/i;
+const COMPARE = /\b(vs\.?|versus|than|faster|slower|rate|keeping up|outpac\w*|backlog growing)\b/i;
+const CI_HISTORY = /\b(how often|fail(ed|s|ures?)?|pass rate|flaky|history|over time|trends?|per day|daily|this week|last \d+ (days?|weeks?))\b/i;
+const CHECK_NAMES = ["assistant-unit", "parity-proof", "help-proof", "smoke", "build"];
+
+function pickCharts(message: string, intent: Intent, linearStates: string[]): ChartKind[] {
+  const charts: ChartKind[] = [];
+  const wantsChart = CHART_WORDS.test(message);
+  if (MERGE_WORDS.test(message) && (wantsChart || /\bhow many\b/i.test(message))) charts.push("prs_per_day");
+  if (TICKET_NOUNS.test(message) && (linearStates.length >= 2 || /\bby (status|state)\b|breakdown/i.test(message) || (wantsChart && intent === "linear_overview"))) {
+    charts.push("tickets_by_state");
+  }
+  if (TICKET_NOUNS.test(message) && OPEN_CLOSE.test(message) && COMPARE.test(message)) charts.push("opened_vs_closed");
+  if ((intent === "ci_health" || CI_WORDS.test(message)) && CI_HISTORY.test(message)) charts.push("ci_history");
+  return charts;
+}
 
 const STATE_WORDS: Array<[RegExp, string]> = [
   [/\btodo\b/i, "Todo"],
@@ -51,6 +76,11 @@ const STOPWORDS = new Set(
 function windowDays(lower: string): number {
   const explicit = lower.match(/\b(?:last|past)\s+(\d{1,3})\s+days?\b/);
   if (explicit) return Math.min(Math.max(Number(explicit[1]), 1), MAX_WINDOW_DAYS);
+  const weeks = lower.match(/\b(?:last|past)\s+(\d{1,2}|two|three|four)\s+weeks?\b/);
+  if (weeks) {
+    const n = { two: 2, three: 3, four: 4 }[weeks[1] as "two"] ?? Number(weeks[1]);
+    return Math.min(Math.max(n * 7, 1), MAX_WINDOW_DAYS);
+  }
   if (/\b(this|last|past) week\b/.test(lower)) return 7;
   if (/\b(this|last|past) month\b/.test(lower)) return MAX_WINDOW_DAYS;
   if (/\b(today|yesterday)\b/.test(lower)) return 2;
@@ -101,5 +131,7 @@ export function planRetrieval(message: string, configuredRepos: string[]): Retri
     wantsPosthog: intent === "trend",
     keywords: extractKeywords(lower),
     style: ["problems", "trend", "general"].includes(intent) || OVERVIEW_WORDS.test(message) ? "overview" : "direct",
+    charts: pickCharts(message, intent, linearStates),
+    checkName: CHECK_NAMES.find((name) => new RegExp(`\\b${name}\\b`, "i").test(message)) ?? null,
   };
 }

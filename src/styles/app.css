@@ -249,6 +249,35 @@ a { color: inherit; }
 .proposal .field-error { margin-top: var(--space-3); }
 .spin { animation: spin 1s linear infinite; }
 
+/* ─── Charts ───────────────────────────────────────────── */
+.chart { margin: var(--space-4) 0 var(--space-2); padding: var(--space-4); background: var(--color-surface); border: 1px solid var(--color-rule); border-radius: var(--radius-md); }
+.chart-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px var(--space-2); }
+.chart-title { font-weight: 600; color: var(--color-ink); }
+.chart-sub { flex-basis: 100%; font-family: var(--font-mono); font-size: 11px; color: var(--color-muted); }
+.chart-legend { display: flex; flex-wrap: wrap; gap: var(--space-4); margin: var(--space-3) 0 0; padding: 0; list-style: none; font-size: var(--text-sm); color: var(--color-text); }
+.chart-legend li { display: inline-flex; align-items: center; gap: 6px; }
+.chart-swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; flex: 0 0 auto; }
+.chart-plot { position: relative; margin-top: var(--space-2); width: 100%; }
+.chart-plot svg { display: block; overflow: visible; }
+.chart-grid { stroke: var(--chart-grid); stroke-width: 1; shape-rendering: crispEdges; }
+.chart-baseline { stroke: var(--chart-axis); stroke-width: 1; shape-rendering: crispEdges; }
+.chart-tick { font-family: var(--font-mono); font-size: 10px; fill: var(--color-muted); font-variant-numeric: tabular-nums; }
+.chart-value { font-family: var(--font-display); font-size: 11px; font-weight: 600; fill: var(--color-ink); }
+.chart-hover-band { fill: rgba(22, 24, 29, 0.045); }
+.chart-tooltip {
+  position: absolute; top: 0; transform: translateX(-50%); z-index: 2; pointer-events: none;
+  display: grid; gap: 3px; min-width: 150px; padding: var(--space-2) var(--space-3);
+  background: var(--color-ink); color: #f4f2ee; border-radius: var(--radius-sm); font-size: 12px; box-shadow: var(--shadow-card);
+}
+.chart-tooltip > span { display: flex; align-items: center; gap: 6px; }
+.chart-tooltip b { margin-left: auto; padding-left: var(--space-3); font-variant-numeric: tabular-nums; }
+.chart-tooltip-total { border-top: 1px solid rgba(255, 255, 255, 0.18); padding-top: 3px; }
+.chart-table { margin-top: var(--space-2); font-size: var(--text-sm); }
+.chart-table summary { cursor: pointer; width: fit-content; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-muted); }
+.chart-table table { margin-top: var(--space-2); border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.chart-table th, .chart-table td { padding: 3px var(--space-3) 3px 0; text-align: left; }
+.chart-table thead th { color: var(--color-muted); font-weight: 500; }
+
 /* ─── Sources ──────────────────────────────────────────── */
 .sources { margin-top: var(--space-4); padding-top: var(--space-4); border-top: 1px dashed var(--color-rule-strong); }
 .section-label { margin: 0 0 var(--space-2); font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-faint); font-weight: 500; }

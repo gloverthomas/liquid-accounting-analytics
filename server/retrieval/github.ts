@@ -130,3 +130,33 @@ export function normalizeCheck(repo: string, ref: string, run: GithubCheckRun): 
     mentions: [],
   };
 }
+
+export interface GithubWorkflowRun {
+  id: number;
+  name: string;
+  status: string;
+  conclusion: string | null;
+  created_at: string;
+  head_branch: string | null;
+  html_url: string;
+}
+
+export interface GithubJob {
+  name: string;
+  conclusion: string | null;
+}
+
+const RUNS_PAGE_SIZE = 100;
+
+/** Workflow runs created on/after `sinceDate` (YYYY-MM-DD), all branches. */
+export async function fetchWorkflowRuns(repo: string, sinceDate: string, deps: GithubDeps): Promise<GithubWorkflowRun[]> {
+  const created = encodeURIComponent(`>=${sinceDate}`);
+  const body = await getJson<{ workflow_runs: GithubWorkflowRun[] }>(`/repos/${repo}/actions/runs?per_page=${RUNS_PAGE_SIZE}&created=${created}`, deps);
+  return body.workflow_runs;
+}
+
+/** Jobs of one run (job names match check names, e.g. "assistant-unit"). */
+export async function fetchRunJobs(repo: string, runId: number, deps: GithubDeps): Promise<GithubJob[]> {
+  const body = await getJson<{ jobs: GithubJob[] }>(`/repos/${repo}/actions/runs/${runId}/jobs?per_page=50`, deps);
+  return body.jobs.map((job) => ({ name: job.name, conclusion: job.conclusion }));
+}

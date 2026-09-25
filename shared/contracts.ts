@@ -57,6 +57,38 @@ export interface ProposedAction {
   expiresAt: number;
 }
 
+/** Colour *roles*; the UI maps them to validated tokens (categorical blue/orange, status green/red). */
+export type ChartColor = "series1" | "series2" | "good" | "critical";
+
+export interface ChartSeries {
+  key: string;
+  name: string;
+  color: ChartColor;
+  /** One value per category, same order as `categories`. */
+  values: number[];
+}
+
+/**
+ * A server-computed chart. Numbers never come from the model, so they always
+ * match the cited sources. "grouped" = side-by-side columns, "stacked" = one column split.
+ */
+export interface ChartSpec {
+  id: string;
+  kind: "grouped" | "stacked";
+  title: string;
+  /** Window + source note, e.g. "Last 7 days · merged PRs on GitHub". */
+  subtitle: string;
+  categories: string[];
+  series: ChartSeries[];
+  /** Unit for tooltips/table, e.g. "PRs", "tickets", "runs". */
+  unit: string;
+  /** True when drawn from sample data rather than live connectors. */
+  sample: boolean;
+}
+
+export const MAX_CHART_CATEGORIES = 31;
+export const MAX_CHART_SERIES = 4;
+
 export interface ChatResponse {
   requestId: string;
   reply: string;
@@ -66,6 +98,7 @@ export interface ChatResponse {
   retrievalMeta: RetrievalMeta;
   latencyMs: number;
   proposedAction?: ProposedAction;
+  charts?: ChartSpec[];
 }
 
 export interface Organisation {

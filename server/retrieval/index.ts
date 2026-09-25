@@ -2,15 +2,17 @@
  * Retrieval orchestration: plan → parallel connector fetch (live or sample) →
  * normalise → rank → pack into the Grok context budget.
  */
-import type { ConnectorId, ConnectorMode, RetrievalMeta } from "../../shared/contracts.js";
+import type { ChartSpec, ConnectorId, ConnectorMode, RetrievalMeta } from "../../shared/contracts.js";
 import type { Config } from "../config.js";
-import { sampleCheckRuns, samplePulls } from "../fixtures/github.js";
-import { sampleLinearIssues } from "../fixtures/linear.js";
+import { sampleCheckRuns, samplePulls, sampleWorkflowRuns } from "../fixtures/github.js";
+import { sampleLinearActivity, sampleLinearIssues } from "../fixtures/linear.js";
 import { errorCode, logEvent } from "../log.js";
 import { CACHE_TTL_MS, retrievalCache, type TtlCache } from "./cache.js";
 import {
   fetchCheckRuns,
   fetchRecentPulls,
+  fetchRunJobs,
+  fetchWorkflowRuns,
   latestPerCheck,
   mergedWithin,
   normalizeCheck,
@@ -18,10 +20,13 @@ import {
   searchPullsMentioning,
   type GithubCheckRun,
   type GithubDeps,
+  type GithubJob,
   type GithubPull,
+  type GithubWorkflowRun,
 } from "./github.js";
-import { fetchLinearIssues, fetchLinearRecent, normalizeLinearIssue, type LinearDeps, type LinearIssueNode } from "./linear.js";
+import { fetchLinearActivity, fetchLinearIssues, fetchLinearRecent, normalizeLinearIssue, type LinearActivityNode, type LinearDeps, type LinearIssueNode } from "./linear.js";
 import { samplePosthogInsight } from "./posthog.js";
+import { buildCharts, describeChart, type ChartInputs, type CiRunPoint } from "../charts.js";
 import { CONTEXT_CHAR_BUDGET, dedupe, packContext, rankItems } from "./rank.js";
 import type { RetrievalPlan } from "./router.js";
 import type { ConnectorResult, FetchLike, RetrievedItem } from "./types.js";
@@ -29,13 +34,18 @@ import type { ConnectorResult, FetchLike, RetrievedItem } from "./types.js";
 interface LinearSource {
   issues(ids: string[]): Promise<LinearIssueNode[]>;
   recent(): Promise<LinearIssueNode[]>;
+  activity(sinceIso: string): Promise<LinearActivityNode[]>;
 }
 
 interface GithubSource {
   pulls(repo: string): Promise<GithubPull[]>;
   search(ids: string[], repos: string[]): Promise<Array<{ repo: string; pull: GithubPull }>>;
   checks(repo: string, ref: string): Promise<GithubCheckRun[]>;
+  runs(repo: string, sinceDate: string): Promise<GithubWorkflowRun[]>;
+  jobs(repo: string, runId: number): Promise<GithubJob[]>;
 }
+
+const MAX_RUNS_WITH_JOBS = 25;
 
 export interface RetrievalDeps {
   fetch: FetchLike;
@@ -48,6 +58,7 @@ export interface RetrievalOutcome {
   context: string;
   items: RetrievedItem[];
   meta: RetrievalMeta;
+  charts: ChartSpec[];
 }
 
 function liveLinear(deps: LinearDeps, cache: TtlCache): LinearSource {
@@ -55,12 +66,14 @@ function liveLinear(deps: LinearDeps, cache: TtlCache): LinearSource {
   return {
     issues: (ids) => cache.getOrLoad(`linear:issues:${ids.join(",")}`, CACHE_TTL_MS.linearIssue, () => fetchLinearIssues(ids, deps)),
     recent: () => cache.getOrLoad(`linear:recent:${scope}`, CACHE_TTL_MS.linearList, () => fetchLinearRecent(deps)),
+    activity: (sinceIso) => cache.getOrLoad(`linear:activity:${scope}:${sinceIso.slice(0, 10)}`, CACHE_TTL_MS.linearList, () => fetchLinearActivity(sinceIso, deps)),
   };
 }
 
 const sampleLinear: LinearSource = {
   issues: async (ids) => sampleLinearIssues().filter((issue) => ids.includes(issue.identifier)),
   recent: async () => sampleLinearIssues(),
+  activity: async () => sampleLinearActivity(),
 };
 
 function liveGithub(deps: GithubDeps, cache: TtlCache): GithubSource {
@@ -69,6 +82,9 @@ function liveGithub(deps: GithubDeps, cache: TtlCache): GithubSource {
     search: (ids, repos) =>
       cache.getOrLoad(`github:search:${ids.join(",")}:${repos.join(",")}`, CACHE_TTL_MS.githubSearch, () => searchPullsMentioning(ids, repos, deps)),
     checks: (repo, ref) => cache.getOrLoad(`github:checks:${repo}:${ref}`, CACHE_TTL_MS.githubChecks, () => fetchCheckRuns(repo, ref, deps)),
+    runs: (repo, sinceDate) => cache.getOrLoad(`github:runs:${repo}:${sinceDate}`, CACHE_TTL_MS.githubChecks, () => fetchWorkflowRuns(repo, sinceDate, deps)),
+    // A finished run's jobs never change, so cache them for the page's life.
+    jobs: (repo, runId) => cache.getOrLoad(`github:jobs:${repo}:${runId}`, 24 * 3_600_000, () => fetchRunJobs(repo, runId, deps)),
   };
 }
 
@@ -77,7 +93,56 @@ const sampleGithub: GithubSource = {
   search: async (ids, repos) =>
     repos.flatMap((repo) => samplePulls(repo).filter((pull) => ids.some((id) => pull.title.includes(id))).map((pull) => ({ repo, pull }))),
   checks: async (repo) => sampleCheckRuns(repo),
+  runs: async (repo) => sampleWorkflowRuns(repo),
+  jobs: async (repo) => sampleCheckRuns(repo).map((run) => ({ name: run.name, conclusion: run.conclusion })),
 };
+
+/** Extra data only chart questions need; failures drop the chart, never the answer. */
+async function collectChartInputs(
+  plan: RetrievalPlan,
+  modes: { linear: ConnectorMode; github: ConnectorMode },
+  sources: { linear: LinearSource | null; github: GithubSource | null },
+  nowMs: number,
+): Promise<Pick<ChartInputs, "activity" | "runs">> {
+  const since = (days: number) => new Date(nowMs - days * 86_400_000).toISOString();
+  const out: Pick<ChartInputs, "activity" | "runs"> = {};
+  const tasks: Array<Promise<void>> = [];
+
+  if (plan.charts.includes("opened_vs_closed") && sources.linear && modes.linear !== "unavailable") {
+    tasks.push(
+      sources.linear.activity(since(Math.max(plan.sinceDays, 28))).then((a) => {
+        out.activity = a;
+      }),
+    );
+  }
+  if (plan.charts.includes("ci_history") && sources.github && modes.github !== "unavailable") {
+    const gh = sources.github;
+    const sinceDate = since(plan.sinceDays).slice(0, 10);
+    tasks.push(
+      Promise.all(
+        plan.repos.map(async (repo): Promise<CiRunPoint[]> => {
+          const runs = (await gh.runs(repo, sinceDate)).filter((r) => r.status === "completed");
+          if (!plan.checkName) return runs.map((r) => ({ repo, createdAt: r.created_at, conclusion: r.conclusion }));
+          const recent = runs.slice(0, MAX_RUNS_WITH_JOBS);
+          return Promise.all(
+            recent.map(async (r) => {
+              const job = (await gh.jobs(repo, r.id)).find((j) => j.name === plan.checkName);
+              return { repo, createdAt: r.created_at, conclusion: r.conclusion, jobConclusion: job ? job.conclusion : null };
+            }),
+          );
+        }),
+      ).then((perRepo) => {
+        out.runs = perRepo.flat();
+      }),
+    );
+  }
+
+  const settled = await Promise.allSettled(tasks);
+  for (const result of settled) {
+    if (result.status === "rejected") logEvent("chart_data_error", { error: errorCode(result.reason) });
+  }
+  return out;
+}
 
 async function collectLinear(source: LinearSource, plan: RetrievalPlan): Promise<RetrievedItem[]> {
   const [detail, recent] = await Promise.all([source.issues(plan.issueIds), source.recent()]);
@@ -181,12 +246,10 @@ export async function runRetrieval(plan: RetrievalPlan, config: Config, deps: Re
   const now = deps.now ?? Date.now;
   const { linear, github, allowFixtures } = config;
 
-  const linearLive = linear.apiKey
-    ? () => collectLinear(liveLinear({ apiKey: linear.apiKey!, fetch: deps.fetch, teamId: linear.teamId, teamKey: linear.teamKey }, cache), plan)
-    : null;
-  const githubLive = github.token
-    ? () => collectGithub(liveGithub({ token: github.token!, fetch: deps.fetch }, cache), plan, github.branch, now())
-    : null;
+  const linearLiveSource = linear.apiKey ? liveLinear({ apiKey: linear.apiKey, fetch: deps.fetch, teamId: linear.teamId, teamKey: linear.teamKey }, cache) : null;
+  const githubLiveSource = github.token ? liveGithub({ token: github.token, fetch: deps.fetch }, cache) : null;
+  const linearLive = linearLiveSource ? () => collectLinear(linearLiveSource, plan) : null;
+  const githubLive = githubLiveSource ? () => collectGithub(githubLiveSource, plan, github.branch, now()) : null;
 
   const tasks: Array<Promise<ConnectorResult>> = [
     runConnector("linear", linearLive, allowFixtures ? () => collectLinear(sampleLinear, plan) : null, now),
@@ -204,7 +267,21 @@ export async function runRetrieval(plan: RetrievalPlan, config: Config, deps: Re
     now(),
   );
   const allItems = results.flatMap((r) => r.items);
-  const counts = [linearCounts(allItems, plan.sinceDays, now()), githubCounts(allItems, plan.sinceDays, now())].filter(Boolean).join("\n\n") || null;
+  const modeOf = (c: ConnectorId): ConnectorMode => results.find((r) => r.connector === c)?.mode ?? "unavailable";
+  const modes = { linear: modeOf("linear"), github: modeOf("github") };
+  let charts: ChartSpec[] = [];
+  if (plan.charts.length) {
+    const extra = await collectChartInputs(
+      plan,
+      modes,
+      { linear: modes.linear === "live" ? linearLiveSource : sampleLinear, github: modes.github === "live" ? githubLiveSource : sampleGithub },
+      now(),
+    );
+    const bugsOnly = plan.keywords.some((k) => /^bugs?$/.test(k));
+    charts = buildCharts(plan, { items: allItems, ...extra, sample: { linear: modes.linear === "sample", github: modes.github === "sample" } }, now(), config.timeZone, bugsOnly);
+  }
+  const chartText = charts.map(describeChart).join("\n");
+  const counts = [chartText, linearCounts(allItems, plan.sinceDays, now()), githubCounts(allItems, plan.sinceDays, now())].filter(Boolean).join("\n\n") || null;
   const packed = packContext(ranked, CONTEXT_CHAR_BUDGET - (counts ? counts.length + 2 : 0));
 
   return {
@@ -218,5 +295,6 @@ export async function runRetrieval(plan: RetrievalPlan, config: Config, deps: Re
       truncated: packed.truncated,
       itemCount: packed.included.length,
     },
+    charts,
   };
 }

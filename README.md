@@ -54,6 +54,23 @@ The full list is in [`.env.example`](.env.example). If a key is set but that ser
 
 Required Vercel env vars (Production and Preview): `LIQUID_INSIGHTS_ACCESS_CODE`, `LIQUID_SESSION_SECRET`, plus whichever connector keys you want live.
 
+## Charts
+
+Some questions come back with a chart above the sources:
+
+| Ask | Chart |
+| --- | --- |
+| "How many PRs merged per day this week, Core vs Reporting?" | PRs merged per day, by repo |
+| "Show our Linear tickets by status" / "Bugs in Todo vs Done" | Tickets by status, bugs stacked on other tickets |
+| "Are we closing bugs faster than we open them?" | Opened vs closed per week (last 4+ weeks) |
+| "How often has assistant-unit failed over the last 2 weeks?" | Passed vs failed per day, for that check or for all CI runs |
+
+- **The server computes every chart number** from Linear and GitHub data (`server/charts.ts`); Grok only writes the prose around it and is given the same numbers.
+- **Days follow `LIQUID_TIMEZONE`** (default Australia/Sydney). Windows up to 14 days are shown per day; longer ones per week.
+- **Colours are validated for colour blindness** with the dataviz checker: blue/orange for comparisons, green/red reserved for passed/failed.
+- **Each chart has a legend, a hover tooltip and a "Show data" table,** so no information is conveyed by colour alone.
+- **Product-usage trends aren't charted yet,** because PostHog is still sample-only.
+
 ## Ticket moves
 
 Ask "Move LIQ-17 to In Progress" (or "Start LIQ-17"):

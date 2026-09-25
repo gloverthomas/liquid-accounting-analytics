@@ -3,7 +3,7 @@
  * citation mapping. Falls back to a canned sample answer or a deterministic
  * digest — never to an answer that contradicts the retrieved sources.
  */
-import type { ChatTurn, Citation, ProposedAction, Provider, RetrievalMeta } from "../shared/contracts.js";
+import type { ChartSpec, ChatTurn, Citation, ProposedAction, Provider, RetrievalMeta } from "../shared/contracts.js";
 import { detectTicketAction, proposeTransition } from "./actions/linearTransition.js";
 import type { Config } from "./config.js";
 import { fixtureAnswerFor } from "./fixtures/responses.js";
@@ -22,6 +22,7 @@ export interface InsightAnswer {
   provider: Provider;
   retrievalMeta: RetrievalMeta;
   proposedAction?: ProposedAction;
+  charts?: ChartSpec[];
 }
 
 export interface InsightDeps extends RetrievalDeps {
@@ -99,7 +100,8 @@ export async function answerQuestion(message: string, history: ChatTurn[], confi
   if (action) return proposeTransition(action, config, deps);
 
   const plan = planRetrieval(message, config.github.repos);
-  const { context, items, meta } = await runRetrieval(plan, config, deps);
+  const { context, items, meta, charts } = await runRetrieval(plan, config, deps);
+  const chartPart = charts.length ? { charts } : {};
 
   if (deps.grok && items.length) {
     try {
@@ -112,14 +114,15 @@ export async function answerQuestion(message: string, history: ChatTurn[], confi
           relatedQuestions: parsed.relatedQuestions.length ? parsed.relatedQuestions : DEFAULT_FOLLOW_UPS,
           provider: `grok:${deps.grok.model}`,
           retrievalMeta: meta,
+          ...chartPart,
         };
       }
       logEvent("grok_fallback", { requestId: deps.requestId, grok_error: "invalid_json_after_repair" });
     } catch (error) {
       logEvent("grok_fallback", { requestId: deps.requestId, grok_error: errorCode(error) });
     }
-    return { ...fallbackAnswer(plan, items, meta, "failed"), retrievalMeta: meta };
+    return { ...fallbackAnswer(plan, items, meta, "failed"), retrievalMeta: meta, ...chartPart };
   }
 
-  return { ...fallbackAnswer(plan, items, meta, deps.grok ? "failed" : "unconfigured"), retrievalMeta: meta };
+  return { ...fallbackAnswer(plan, items, meta, deps.grok ? "failed" : "unconfigured"), retrievalMeta: meta, ...chartPart };
 }

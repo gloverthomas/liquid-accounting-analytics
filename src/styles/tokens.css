@@ -22,6 +22,15 @@
   --status-neutral: #6b7280;
   --status-neutral-wash: #f4f2ee;
 
+  /* Chart palette: validated with the dataviz checker against --color-paper (all checks pass).
+     Categorical slots never reuse status hues; status is reserved for passed/failed. */
+  --chart-series-1: #2a78d6;
+  --chart-series-2: #eb6834;
+  --chart-good: #0ca30c;
+  --chart-critical: #d03b3b;
+  --chart-grid: #ebe7e1;
+  --chart-axis: #cfc9bf;
+
   --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
 

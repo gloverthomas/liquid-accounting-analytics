@@ -18,6 +18,8 @@ export interface Config {
   /** Write-scoped Linear key for confirmed ticket moves. Absent = actions off. */
   actions: { linearApiKey: string | null; allowedStates: string[]; secret: string | null };
   github: { token: string | null; repos: string[]; branch: string };
+  /** IANA zone for day/week chart buckets. */
+  timeZone: string;
 }
 
 type Env = Record<string, string | undefined>;
@@ -46,6 +48,16 @@ function parseRepos(raw: string | null): string[] {
     .map((repo) => repo.trim())
     .filter((repo) => REPO_PATTERN.test(repo));
   return repos.length ? repos : DEFAULT_REPOS;
+}
+
+function parseTimeZone(raw: string | null): string {
+  const zone = raw ?? "Australia/Sydney";
+  try {
+    new Intl.DateTimeFormat("en", { timeZone: zone });
+    return zone;
+  } catch {
+    return "UTC";
+  }
 }
 
 function parseTimeout(raw: string | null): number {
@@ -93,6 +105,7 @@ export function loadConfig(env: Env = process.env): Config {
       repos: parseRepos(str(env, "GITHUB_REPOS")),
       branch: str(env, "GITHUB_BRANCH") ?? "main",
     },
+    timeZone: parseTimeZone(str(env, "LIQUID_TIMEZONE")),
   };
 }
 

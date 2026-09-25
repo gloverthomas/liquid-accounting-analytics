@@ -2,7 +2,7 @@
  * Sample Linear data (shape = Linear GraphQL nodes) used when LINEAR_API_KEY is
  * not configured. Narrative mirrors the Liquid demo: LIQ-24 is the hero defect.
  */
-import type { LinearIssueNode } from "../retrieval/linear.js";
+import type { LinearActivityNode, LinearIssueNode } from "../retrieval/linear.js";
 import { daysAgo } from "./time.js";
 
 const TEAM_URL = "https://linear.app/liquid-accounting/issue";
@@ -108,4 +108,14 @@ export function sampleLinearIssues(): LinearIssueNode[] {
       comments: { nodes: [] },
     },
   ];
+}
+
+/** Sample created/completed dates for "opened vs closed" charts, derived from the sample tickets. */
+export function sampleLinearActivity(nowMs = Date.now()): LinearActivityNode[] {
+  return sampleLinearIssues().map((issue, i) => ({
+    identifier: issue.identifier,
+    createdAt: daysAgo(3 + i * 4, nowMs),
+    completedAt: issue.state?.type === "completed" ? issue.updatedAt : null,
+    labels: issue.labels ?? null,
+  }));
 }

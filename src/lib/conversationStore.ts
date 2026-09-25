@@ -4,7 +4,8 @@
  * localStorage. Stored data is treated as untrusted: malformed records are
  * dropped on load, and answers still render through the safe markdown path.
  */
-import type { ChatResponse } from "../../shared/contracts";
+import type { ChartSpec, ChatResponse } from "../../shared/contracts";
+import { sanitizeChart } from "./chart";
 
 export type StoredEntry = { id: string; role: "user"; content: string } | { id: string; role: "assistant"; response: ChatResponse };
 
@@ -47,12 +48,15 @@ function isProposal(v: unknown): boolean {
   );
 }
 
-/** Keeps a valid proposal; silently drops a malformed one (the server re-validates the token anyway). */
+/** Keeps valid proposals/charts; drops malformed ones (the server re-validates tokens anyway). */
 function sanitizeResponse(response: ChatResponse): ChatResponse {
-  if (response.proposedAction === undefined || isProposal(response.proposedAction)) return response;
-  const { proposedAction: _dropped, ...rest } = response;
-  void _dropped;
-  return rest;
+  const { proposedAction, charts, ...rest } = response;
+  const cleanCharts = Array.isArray(charts) ? charts.map(sanitizeChart).filter((c): c is ChartSpec => c !== null) : [];
+  return {
+    ...rest,
+    ...(proposedAction !== undefined && isProposal(proposedAction) ? { proposedAction } : {}),
+    ...(cleanCharts.length ? { charts: cleanCharts } : {}),
+  };
 }
 
 function isEntry(v: unknown): v is StoredEntry {

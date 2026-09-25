@@ -4,6 +4,7 @@ import type { ChatResponse } from "../../shared/contracts";
 import type { ThreadEntry } from "../hooks/useInsightsChat";
 import { ActionProposal } from "./ActionProposal";
 import { AnswerMarkdown } from "./AnswerMarkdown";
+import { Chart } from "./Chart";
 import { CitationList } from "./CitationList";
 import { PromptPills } from "./PromptPills";
 import { SourcesAccordion } from "./SourcesAccordion";
@@ -53,6 +54,7 @@ function AssistantCard({ entryId, response, onAsk, disabled, isLatest, onConfirm
         {sourceBadge(response)}
       </header>
       <AnswerMarkdown text={response.reply} citationIndex={citationIndex} anchorPrefix={anchorPrefix} />
+      {response.charts?.map((chart) => <Chart key={chart.id} chart={chart} />)}
       {response.proposedAction && isLatest ? (
         <ActionProposal
           action={response.proposedAction}
