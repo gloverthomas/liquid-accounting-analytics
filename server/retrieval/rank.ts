@@ -16,7 +16,7 @@ const INTENT_BOOST: Record<Intent, Partial<Record<Kind, number>>> = {
   merged_prs: { github_pr: 40 },
   linear_overview: { linear_issue: 40 },
   trend: { posthog_insight: 40, github_pr: 15, linear_issue: 10 },
-  problems: { linear_issue: 20, github_check: 10, github_pr: 5 },
+  problems: { linear_issue: 20, github_check: 10, github_pr: 5, sentry_issue: 25 },
   insights_usage: { posthog_insight: 40 },
   general: {},
 };
