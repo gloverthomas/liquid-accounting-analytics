@@ -3,6 +3,7 @@
  * the real request uses (no network). The UI shows them while it waits, so
  * the loading state says what's actually happening.
  */
+import { isHelpQuestion } from "../shared/askCatalog.js";
 import { detectTicketAction } from "./actions/linearTransition.js";
 import type { Config } from "./config.js";
 import { planRetrieval, type ChartKind } from "./retrieval/router.js";
@@ -28,6 +29,7 @@ function list(items: string[]): string {
 }
 
 export function progressSteps(message: string, config: Config): string[] {
+  if (isHelpQuestion(message)) return ["Listing what Insights can answer…"];
   const action = detectTicketAction(message);
   if (action) {
     return action.issueIds.length === 1

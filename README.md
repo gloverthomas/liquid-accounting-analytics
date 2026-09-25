@@ -99,6 +99,10 @@ Ask "Move LIQ-17 to In Progress" (or "Start LIQ-17"):
 
 It is limited to `LIQUID_ACTIONS_ALLOWED_STATES` (default: In Progress), to the configured Linear team, and to 10 confirmations per minute per IP. Anyone with the access code can move tickets, so share the code accordingly.
 
+## "What can I ask?"
+
+Under the prompt pills on the home screen, **What can I ask?** opens every topic Insights covers (tickets, PRs & CI, problems & errors, product analytics, the Cursor workflow, actions, and Insights itself), each with example questions that ask on click. Typing "What can I ask?" or "help" in the chat gives the same list as an answer (no Grok call). The examples live in `shared/askCatalog.ts`, and a test checks that each one routes to a specific intent.
+
 ## Cursor workflow: plans, evals, pipeline
 
 Insights reads the [liquid-workflow](https://github.com/gloverthomas/liquid-workflow) service (Cursor SDK plan → eval → approval → implement):

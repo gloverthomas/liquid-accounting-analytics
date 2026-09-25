@@ -25,6 +25,7 @@ export const TOPIC_LABELS: Record<string, string> = {
   workflow_plan: "Cursor plans",
   evals: "Eval tracking",
   pipeline: "Pipeline tracker",
+  help: "What can I ask?",
 };
 
 export interface QuestionRow {

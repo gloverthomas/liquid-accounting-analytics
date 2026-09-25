@@ -68,7 +68,7 @@ const TICKET_NOUNS = /\b(tickets?|bugs?|issues?|defects?)\b/i;
 const OPEN_CLOSE = /\b(open(ed|ing)?|creat(ed|ing)|new|clos(e|ed|ing)|resolv(e|ed|ing)|fix(ed|ing)?)\b/i;
 const COMPARE = /\b(vs\.?|versus|than|faster|slower|rate|keeping up|outpac\w*|backlog growing)\b/i;
 const CI_HISTORY = /\b(how often|fail(ed|s|ures?)?|pass rate|flaky|history|over time|trends?|per day|daily|this week|last \d+ (days?|weeks?))\b/i;
-const PRODUCT_WORDS = /\b(usage|adoption|users?|traffic|page ?views?|visits?|engagement|posthog|product analytics|navigation|active|activity in the apps?)\b/i;
+const PRODUCT_WORDS = /\b(usage|adoption|users?|traffic|page ?views?|visits?|engagement|posthog|product analytics|navigation|active|activity in the apps?|using the (product|apps?|ai assistant|assistant)|being used)\b/i;
 const BFF_WORDS = /\b(bff|connect(ed|ion|ivity)?|disconnect(ed|s)?|offline|outage|backend status)\b/i;
 const GOING = /\b(going up|going down|growing|dropping|increas\w*|decreas\w*|up or down|chang(e|ed|ing))\b/i;
 /** CI named outright (not just "checks", which BFF questions also use). */

@@ -4,6 +4,7 @@
  * digest — never to an answer that contradicts the retrieved sources.
  */
 import type { ChartSpec, ChatTurn, Citation, PipelineTimeline, ProposedAction, Provider, RetrievalMeta } from "../shared/contracts.js";
+import { ASK_CATALOG, isHelpQuestion } from "../shared/askCatalog.js";
 import { proposeImplement } from "./actions/workflowImplement.js";
 import { runWorkflowQuestion } from "./workflowQuestions.js";
 import { detectTicketAction, proposeTransition } from "./actions/linearTransition.js";
@@ -98,7 +99,20 @@ function fallbackAnswer(plan: RetrievalPlan, items: RetrievedItem[], meta: Retri
   return { ...digestAnswer(items, reason), provider: "digest" };
 }
 
+/** The in-chat version of the "What can I ask?" panel. Deterministic: no retrieval, no Grok. */
+export function helpAnswer(): InsightAnswer {
+  const lines = ASK_CATALOG.map((t) => `- **${t.title}** (${t.sources}): ${t.blurb} Try "${t.examples[0]}"`);
+  return {
+    reply: `**You can ask about tickets, code, errors, product usage and the Cursor workflow.** Every answer cites its sources.\n${lines.join("\n")}\n\nAdd a time window ("last 2 weeks") or a ticket id (LIQ-24) to narrow things down.`,
+    citations: [],
+    relatedQuestions: ["How are our evals tracking?", "What issues have we had from our code base this week?", "Where is LIQ-24 in the pipeline?"],
+    provider: "digest",
+    retrievalMeta: { connectors: [], connectorModes: {}, window: "n/a", truncated: false, itemCount: 0 },
+  };
+}
+
 export async function answerQuestion(message: string, history: ChatTurn[], config: Config, deps: InsightDeps): Promise<InsightAnswer> {
+  if (isHelpQuestion(message)) return helpAnswer();
   // Requests to change a ticket never reach Grok: rules detect them and the viewer must confirm.
   const action = detectTicketAction(message);
   if (action) return proposeTransition(action, config, deps);

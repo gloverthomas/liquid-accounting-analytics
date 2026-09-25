@@ -1,4 +1,5 @@
 import type { SuggestedPrompt } from "../../shared/contracts";
+import { AskCatalog } from "./AskCatalog";
 import { Composer } from "./Composer";
 import { PromptPills } from "./PromptPills";
 
@@ -22,6 +23,9 @@ export function InsightsHero({ draft, onDraftChange, onAsk, prompts, disabled }:
       </div>
       <div className="reveal reveal-4">
         <PromptPills items={prompts} onPick={onAsk} disabled={disabled} label="Try asking" className="pills-hero" />
+      </div>
+      <div className="reveal reveal-4">
+        <AskCatalog onAsk={onAsk} disabled={disabled} />
       </div>
     </section>
   );

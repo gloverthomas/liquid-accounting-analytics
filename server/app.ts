@@ -14,6 +14,7 @@ import { progressSteps } from "./progress.js";
 import { detectTicketAction } from "./actions/linearTransition.js";
 import { planRetrieval } from "./retrieval/router.js";
 import { anonymousViewerId, recordQuestion, type QuestionRecord } from "./telemetry.js";
+import { isHelpQuestion } from "../shared/askCatalog.js";
 import { errorCode, logEvent } from "./log.js";
 import { ORGS, DEFAULT_ORG, SUGGESTED_PROMPTS } from "./org.js";
 import { RATE_LIMITS, RateLimiter } from "./rateLimit.js";
@@ -97,12 +98,13 @@ export function createApp(deps: AppDeps): AppHandler {
 
     const started = now();
     const action = detectTicketAction(message);
+    const help = isHelpQuestion(message);
     const plan = planRetrieval(message, config.github.repos);
     const record = (answer: Omit<QuestionRecord, "topic" | "style" | "charts" | "windowDays">): Promise<void> =>
       recordQuestion(config, fetchImpl, viewerIdFor(request, config), {
-        topic: action ? "ticket_move" : plan.intent,
-        style: action ? "action" : plan.style,
-        charts: action ? [] : plan.charts,
+        topic: action ? "ticket_move" : help ? "help" : plan.intent,
+        style: action ? "action" : help ? "direct" : plan.style,
+        charts: action || help ? [] : plan.charts,
         windowDays: plan.sinceDays,
         ...answer,
       });
@@ -121,7 +123,7 @@ export function createApp(deps: AppDeps): AppHandler {
         .filter(([, mode]) => mode !== "unavailable")
         .map(([c]) => c),
       answerType,
-      outcome: answerType === "digest" ? "fallback" : "answered",
+      outcome: answerType === "digest" && !help ? "fallback" : "answered",
       latencyMs,
       citationCount: answer.citations.length,
     });
