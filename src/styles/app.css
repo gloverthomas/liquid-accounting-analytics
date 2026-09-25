@@ -67,10 +67,16 @@ a { color: inherit; }
 }
 .icon-button:hover { background: rgba(22, 24, 29, 0.06); color: var(--color-ink); }
 .menu-button { display: none; }
-/* Desktop: collapsing hides the column and brings back the top-bar button to reopen it. */
+.sidebar-expand { display: none; }
+/* Desktop: collapsing shrinks the column to a slim rail; the toggle stays where it was. */
 @media (min-width: 900px) {
-  .shell[data-sidebar="collapsed"] .sidebar { display: none; }
-  .shell[data-sidebar="collapsed"] .menu-button { display: inline-grid; }
+  .shell[data-sidebar="collapsed"] .sidebar { width: var(--rail-width); flex-basis: var(--rail-width); padding-left: 0; padding-right: 0; overflow: hidden; }
+  .shell[data-sidebar="collapsed"] .sidebar-head { justify-content: center; padding-left: 0; }
+  .shell[data-sidebar="collapsed"] .sidebar-head .section-label,
+  .shell[data-sidebar="collapsed"] .sidebar-collapse,
+  .shell[data-sidebar="collapsed"] .history-list,
+  .shell[data-sidebar="collapsed"] .history-empty { display: none; }
+  .shell[data-sidebar="collapsed"] .sidebar-expand { display: inline-grid; }
 }
 
 .new-chat {
@@ -94,7 +100,7 @@ a { color: inherit; }
   border-right: 1px solid var(--color-rule); background: color-mix(in srgb, var(--color-paper) 70%, #fff);
 }
 .sidebar-head { display: flex; align-items: center; justify-content: space-between; margin-top: -6px; padding: 0 0 var(--space-2) var(--space-2); }
-.sidebar-collapse { width: 30px; height: 30px; }
+.sidebar-collapse, .sidebar-expand { width: 30px; height: 30px; }
 .sidebar-head .section-label { margin: 0; }
 .history-list { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
 .history-item { position: relative; display: flex; align-items: center; border-radius: var(--radius-sm); }

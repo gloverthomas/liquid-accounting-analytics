@@ -131,8 +131,8 @@ function Workspace({ orgs, prompts }: { orgs: Organisation[]; prompts: Suggested
             type="button"
             className="icon-button menu-button"
             onClick={sidebar.show}
-            aria-label="Show chat history"
-            title="Show chat history"
+            aria-label="Open chat history"
+            title="Open chat history"
             aria-expanded={sidebar.drawerOpen}
             aria-controls="history"
           >
@@ -160,6 +160,7 @@ function Workspace({ orgs, prompts }: { orgs: Organisation[]; prompts: Suggested
           open={sidebar.drawerOpen}
           onClose={sidebar.closeDrawer}
           onHide={sidebar.hide}
+          onShow={sidebar.show}
         />
         <ChatPane key={activeId} orgId={orgId} prompts={prompts} conversationId={activeId} store={history} />
       </div>
