@@ -22,7 +22,7 @@ import {
 } from "./github.js";
 import { fetchLinearIssues, fetchLinearRecent, normalizeLinearIssue, type LinearDeps, type LinearIssueNode } from "./linear.js";
 import { samplePosthogInsight } from "./posthog.js";
-import { packContext, rankItems } from "./rank.js";
+import { CONTEXT_CHAR_BUDGET, dedupe, packContext, rankItems } from "./rank.js";
 import type { RetrievalPlan } from "./router.js";
 import type { ConnectorResult, FetchLike, RetrievedItem } from "./types.js";
 
@@ -96,6 +96,36 @@ async function collectGithub(source: GithubSource, plan: RetrievalPlan, branch: 
   return groups.flat();
 }
 
+/** Tags each sample item inline so Grok can't blend it with live data. Keeps the leading [id]. */
+function markSample(item: RetrievedItem): RetrievedItem {
+  const idToken = `[${item.citation.id}]`;
+  if (!item.text.startsWith(idToken) || item.text.includes("SAMPLE DATA")) return item;
+  return { ...item, text: `${idToken} (SAMPLE DATA)${item.text.slice(idToken.length)}` };
+}
+
+function tally(values: string[]): string {
+  const counts = new Map<string, number>();
+  for (const v of values) counts.set(v, (counts.get(v) ?? 0) + 1);
+  return [...counts].sort((a, b) => b[1] - a[1]).map(([k, n]) => `${k} ${n}`).join(", ");
+}
+
+/**
+ * Deterministic counts over every Linear issue retrieved (before the context
+ * budget trims anything) — the model reads numbers here instead of counting.
+ */
+export function linearCounts(items: RetrievedItem[]): string | null {
+  const issues = dedupe(items.filter((item) => item.citation.kind === "linear_issue"));
+  if (!issues.length) return null;
+  const lines = [`COUNTS (computed by the server over the ${issues.length} most recently updated Linear issues; use these for any numbers):`];
+  lines.push(`- All issues by state: ${tally(issues.map((i) => i.citation.status ?? "Unknown"))}`);
+  const labels = [...new Set(issues.flatMap((i) => i.labels ?? []))].sort();
+  for (const label of labels) {
+    const tagged = issues.filter((i) => i.labels?.includes(label));
+    lines.push(`- Label "${label}" by state: ${tally(tagged.map((i) => i.citation.status ?? "Unknown"))} (${tagged.map((i) => i.mentions[0]).join(", ")})`);
+  }
+  return lines.join("\n");
+}
+
 async function runConnector(
   connector: ConnectorId,
   live: (() => Promise<RetrievedItem[]>) | null,
@@ -112,7 +142,7 @@ async function runConnector(
       return { connector, mode: "unavailable", fetchedAt, items: [] };
     }
   }
-  if (sample) return { connector, mode: "sample", fetchedAt, items: await sample() };
+  if (sample) return { connector, mode: "sample", fetchedAt, items: (await sample()).map(markSample) };
   return { connector, mode: "unavailable", fetchedAt, items: [] };
 }
 
@@ -143,11 +173,12 @@ export async function runRetrieval(plan: RetrievalPlan, config: Config, deps: Re
     plan,
     now(),
   );
-  const packed = packContext(ranked);
+  const counts = linearCounts(results.flatMap((r) => r.items));
+  const packed = packContext(ranked, CONTEXT_CHAR_BUDGET - (counts ? counts.length + 2 : 0));
 
   return {
     results,
-    context: packed.context,
+    context: counts ? `${counts}\n\n${packed.context}` : packed.context,
     items: packed.included,
     meta: {
       connectors: results.map((r) => r.connector),

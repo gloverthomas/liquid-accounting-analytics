@@ -98,5 +98,6 @@ export function normalizeLinearIssue(node: LinearIssueNode): RetrievedItem {
     text: lines.join("\n"),
     updatedAt: node.updatedAt,
     mentions: [node.identifier.toUpperCase()],
+    labels: node.labels?.nodes.map((l) => l.name) ?? [],
   };
 }

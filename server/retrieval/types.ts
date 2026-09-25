@@ -12,6 +12,8 @@ export interface RetrievedItem {
   updatedAt: string | null;
   /** Identifiers this item is "about" (e.g. LIQ-24), for exact-match boosting. */
   mentions: string[];
+  /** Linear labels, used for computed counts (never sent separately to the browser). */
+  labels?: string[];
 }
 
 export interface ConnectorResult {

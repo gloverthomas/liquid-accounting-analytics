@@ -161,11 +161,28 @@ describe("runRetrieval (live, mocked)", () => {
     const fetch = mockFetch();
     const sample = await runRetrieval(planRetrieval("Are assistant failures increasing?", makeConfig().github.repos), makeConfig(), { fetch, cache });
     expect(sample.meta.connectorModes).toEqual({ linear: "sample", github: "sample", posthog: "sample" });
+    // Every sample item is tagged inline, right after its citation id, exactly once.
+    for (const item of sample.items) {
+      expect(item.text.startsWith(`[${item.citation.id}]`)).toBe(true);
+      expect(item.text.match(/SAMPLE DATA/g)).toHaveLength(1);
+    }
     expect(fetch.calls).toHaveLength(0);
 
     const off = makeConfig({ LIQUID_INSIGHTS_ALLOW_FIXTURES: "false" });
     const none = await runRetrieval(planRetrieval("status of LIQ-24", off.github.repos), off, { fetch, cache });
     expect(none.items).toEqual([]);
     expect(none.meta.connectorModes).toEqual({ linear: "unavailable", github: "unavailable" });
+  });
+});
+
+describe("linearCounts", () => {
+  it("tallies states overall and per label, deduping ids", async () => {
+    const { linearCounts } = await import("../../server/retrieval/index.js");
+    const mk = (id: string, state: string, labels: string[]) => normalizeLinearIssue({ ...LIQ_16, identifier: id, state: { name: state }, labels: { nodes: labels.map((name) => ({ name })) } });
+    const text = linearCounts([mk("LIQ-1", "Done", ["Bug"]), mk("LIQ-2", "Done", ["Bug"]), mk("LIQ-3", "In Progress", ["Bug"]), mk("LIQ-4", "Todo", []), mk("LIQ-1", "Done", ["Bug"])])!;
+    expect(text).toContain("over the 4 most recently updated");
+    expect(text).toContain("All issues by state: Done 2, In Progress 1, Todo 1");
+    expect(text).toContain('Label "Bug" by state: Done 2, In Progress 1 (LIQ-1, LIQ-2, LIQ-3)');
+    expect(linearCounts([])).toBeNull();
   });
 });
