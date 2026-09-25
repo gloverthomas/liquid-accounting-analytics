@@ -1,6 +1,6 @@
 # Liquid Insights (liquid-accounting-analytics)
 
-Ask plain-English questions about **Linear tickets, GitHub pull requests and CI checks** and get a short answer from Grok with **a cited source for every claim**. The app is read-only: it never changes Linear or GitHub.
+Ask plain-English questions about **Linear tickets, GitHub pull requests and CI checks** and get a short answer from Grok with **a cited source for every claim**. It never changes GitHub. The one change it can make is **moving a Linear ticket to In Progress**, and only after you click Confirm (see [Ticket moves](#ticket-moves)).
 
 Built from [`docs/grok-insights-chat-spec.md`](docs/grok-insights-chat-spec.md) (MVP scope). This is a separate product from the in-app finance assistant in `liquid-accounting-core`.
 
@@ -33,6 +33,7 @@ With no keys it runs in **sample mode**: realistic LIQ-24 demo data and canned a
 | `GITHUB_REPOS` | – | Defaults to Core + Reporting |
 | `LIQUID_BFF_DEMO_TOKEN` | Local dev auth | Injected by the Vite proxy; never in the bundle |
 | `LIQUID_INSIGHTS_ACCESS_CODE` / `LIQUID_SESSION_SECRET` | **Hosted auth** | Required on Vercel, or every API route returns 503 |
+| `LINEAR_ACTIONS_API_KEY` | Ticket moves | A **separate** Linear key with write access; without it the app stays read-only |
 
 The full list is in [`.env.example`](.env.example). If a key is set but that service fails, the answer marks it "unavailable" rather than quietly switching to sample data.
 
@@ -52,6 +53,17 @@ The full list is in [`.env.example`](.env.example). If a key is set but that ser
 **Hosted auth:** viewers enter a shared access code once, and the server sets a signed `__Host-` session cookie (HttpOnly, Secure, SameSite=Strict, 12 hours). The demo bearer token is **refused** in production unless you explicitly set `LIQUID_ALLOW_DEMO_TOKEN=true`.
 
 Required Vercel env vars (Production and Preview): `LIQUID_INSIGHTS_ACCESS_CODE`, `LIQUID_SESSION_SECRET`, plus whichever connector keys you want live.
+
+## Ticket moves
+
+Ask "Move LIQ-17 to In Progress" (or "Start LIQ-17"):
+
+1. **Detected by rules, not by Grok**, so the model can never decide to act on its own.
+2. The answer shows a **confirm card** (ticket, from → to). Nothing changes yet.
+3. **Confirm** posts a signed, 5-minute token tied to that exact ticket and state. The server re-checks the ticket's team and current state, moves it with the write key, and adds an **audit comment** to the ticket. A replayed token is a no-op.
+4. If the `liquid-workflow` Linear webhook is connected, moving to In Progress starts the Cursor SDK workflow (plan → eval → human approval before any PR).
+
+It is limited to `LIQUID_ACTIONS_ALLOWED_STATES` (default: In Progress), to the configured Linear team, and to 10 confirmations per minute per IP. Anyone with the access code can move tickets, so share the code accordingly.
 
 ## Security posture
 

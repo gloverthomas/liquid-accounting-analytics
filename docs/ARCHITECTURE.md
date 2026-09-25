@@ -42,7 +42,15 @@ Only retrieval is cached, in a per-instance TTL/LRU store holding up to 200 entr
 
 Comparisons are constant-time (both sides are hashed first). In production the demo token is refused unless `LIQUID_ALLOW_DEMO_TOKEN=true`. With no auth configured, every protected route returns 503.
 
+## Ticket moves (`server/actions/`)
+
+- `detectTicketAction` runs before retrieval. A match skips Grok entirely: `proposeTransition` only reads, then returns a `proposedAction` carrying an HMAC token (`issueId`, `toState`, expiry 5 min; signed with `LIQUID_SESSION_SECRET`, or the demo token locally).
+- `POST /api/v1/actions/linear-transition { token }` verifies the token, the allowed state and the team, re-reads the current state (idempotent), then runs `issueUpdate` and a best-effort `commentCreate` audit comment using `LINEAR_ACTIONS_API_KEY`.
+- The UI only renders the confirm card on the newest answer. Stored proposals are shape-validated on load, and the server re-validates the token regardless.
+
 ## Deviations from the spec (and why)
+
+- **Ticket moves were added at the product owner's request.** The spec forbade write actions. The compromise is a single, confirm-gated, allow-listed transition with a separate write key and an audit comment on the ticket.
 
 - **Hosted auth uses an access code and session cookie**, not proxy-injected bearer tokens. There is no proxy on Vercel, so a bearer token would have to ship in the bundle.
 - **The Grok timeout defaults to 12 s instead of 8 s,** because this prompt carries up to 12k characters of context. Set `XAI_TIMEOUT_MS` to change it.

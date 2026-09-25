@@ -13,6 +13,7 @@ export const RATE_LIMITS = {
   general: { name: "general", windowMs: 60_000, max: 180 },
   chat: { name: "chat", windowMs: 60_000, max: 20 },
   session: { name: "session", windowMs: 60_000, max: 10 },
+  action: { name: "action", windowMs: 60_000, max: 10 },
 } as const satisfies Record<string, RateLimitRule>;
 
 const MAX_TRACKED_KEYS = 5_000;

@@ -34,7 +34,7 @@ const SUMMARY_FIELDS = `identifier title url priorityLabel updatedAt
 const DETAIL_FIELDS = `${SUMMARY_FIELDS} description
   comments(first: ${COMMENT_LIMIT}, orderBy: createdAt) { nodes { body createdAt user { displayName } } }`;
 
-async function graphql<T>(deps: LinearDeps, query: string, variables: Record<string, unknown>): Promise<{ data: T | null; errors: unknown[] }> {
+export async function graphql<T>(deps: Pick<LinearDeps, "apiKey" | "fetch">, query: string, variables: Record<string, unknown>): Promise<{ data: T | null; errors: unknown[] }> {
   const res = await deps.fetch(LINEAR_GRAPHQL_URL, {
     method: "POST",
     headers: { Authorization: deps.apiKey, "Content-Type": "application/json" },

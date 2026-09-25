@@ -38,6 +38,23 @@ function isResponse(v: unknown): v is ChatResponse {
   );
 }
 
+function isProposal(v: unknown): boolean {
+  return (
+    isObject(v) &&
+    v.kind === "linear_transition" &&
+    ["issueId", "issueTitle", "url", "fromState", "toState", "token"].every((k) => typeof v[k] === "string") &&
+    typeof v.expiresAt === "number"
+  );
+}
+
+/** Keeps a valid proposal; silently drops a malformed one (the server re-validates the token anyway). */
+function sanitizeResponse(response: ChatResponse): ChatResponse {
+  if (response.proposedAction === undefined || isProposal(response.proposedAction)) return response;
+  const { proposedAction: _dropped, ...rest } = response;
+  void _dropped;
+  return rest;
+}
+
 function isEntry(v: unknown): v is StoredEntry {
   if (!isObject(v) || typeof v.id !== "string") return false;
   if (v.role === "user") return typeof v.content === "string";
@@ -86,7 +103,14 @@ export function parseConversations(raw: string | null): Conversation[] {
   if (!Array.isArray(data)) return [];
   return data
     .filter(isConversation)
-    .map((c) => ({ ...c, title: c.title.slice(0, MAX_TITLE_CHARS), entries: c.entries.filter(isEntry).slice(-MAX_ENTRIES_PER_CONVERSATION) }))
+    .map((c) => ({
+      ...c,
+      title: c.title.slice(0, MAX_TITLE_CHARS),
+      entries: c.entries
+        .filter(isEntry)
+        .map((e) => (e.role === "assistant" ? { ...e, response: sanitizeResponse(e.response) } : e))
+        .slice(-MAX_ENTRIES_PER_CONVERSATION),
+    }))
     .filter((c) => c.entries.length > 0)
     .sort((a, b) => b.updatedAt - a.updatedAt)
     .slice(0, MAX_CONVERSATIONS);

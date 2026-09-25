@@ -5,7 +5,7 @@
  */
 import { useCallback, useEffect, useRef } from "react";
 import { HISTORY_MAX_TURNS, MESSAGE_MAX_CHARS, MESSAGE_MIN_CHARS, type ChatTurn } from "../../shared/contracts";
-import { api, describeError } from "../lib/api";
+import { api, ApiRequestError, describeError } from "../lib/api";
 import type { ConversationsApi, ThreadEntry } from "./useConversations";
 
 export type { ThreadEntry } from "./useConversations";
@@ -17,6 +17,9 @@ export interface InsightsChat {
   isSending: boolean;
   send: (message: string) => Promise<void>;
   retry: (message: string) => Promise<void>;
+  /** Runs a proposed ticket move. Resolves to an error message to show inline, or null on success. */
+  confirmAction: (entryId: string) => Promise<string | null>;
+  dismissAction: (entryId: string) => void;
 }
 
 let counter = 0;
@@ -95,5 +98,48 @@ export function useInsightsChat(orgId: string | undefined, conversationId: strin
     [ask, conversationId],
   );
 
-  return { entries: store.entriesOf(conversationId), isSending: store.isPending(conversationId), send, retry };
+  /** Removes a proposal from its answer so its buttons can't be used again. */
+  const clearProposal = useCallback((id: string, entryId: string) => {
+    storeRef.current.update(id, (prev) =>
+      prev.map((e) => {
+        if (e.id !== entryId || e.role !== "assistant" || !e.response.proposedAction) return e;
+        const { proposedAction: _used, ...response } = e.response;
+        void _used;
+        return { ...e, response };
+      }),
+    );
+  }, []);
+
+  const dismissAction = useCallback((entryId: string) => clearProposal(conversationId, entryId), [clearProposal, conversationId]);
+
+  const confirmAction = useCallback(
+    async (entryId: string) => {
+      const id = conversationId;
+      const entry = storeRef.current.entriesOf(id).find((e) => e.id === entryId);
+      const proposal = entry?.role === "assistant" ? entry.response.proposedAction : undefined;
+      if (!proposal || storeRef.current.isPending(id)) return null;
+      storeRef.current.setPending(id, true);
+      try {
+        const response = await api.confirmTransition(proposal.token);
+        clearProposal(id, entryId);
+        storeRef.current.update(id, (prev) => [...prev, { id: nextId("a"), role: "assistant", response }]);
+        return null;
+      } catch (error) {
+        // An expired or refused confirmation can't reuse its token: retire the card and
+        // offer "Try again", which asks afresh and yields a new proposal.
+        if (error instanceof ApiRequestError && [400, 403, 404, 410].includes(error.status)) {
+          clearProposal(id, entryId);
+          const retryOf = `Move ${proposal.issueId} to ${proposal.toState}`;
+          storeRef.current.update(id, (prev) => [...prev, { id: nextId("e"), role: "error", message: describeError(error), retryOf }]);
+          return null;
+        }
+        return describeError(error);
+      } finally {
+        storeRef.current.setPending(id, false);
+      }
+    },
+    [clearProposal, conversationId],
+  );
+
+  return { entries: store.entriesOf(conversationId), isSending: store.isPending(conversationId), send, retry, confirmAction, dismissAction };
 }

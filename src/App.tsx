@@ -90,6 +90,8 @@ function ChatPane({ orgId, prompts, conversationId, store }: ChatPaneProps) {
               interruptedQuestion={interrupted}
               onAsk={ask}
               onRetry={(q) => void chat.retry(q)}
+              onConfirmAction={chat.confirmAction}
+              onDismissAction={chat.dismissAction}
             />
           </>
         ) : (

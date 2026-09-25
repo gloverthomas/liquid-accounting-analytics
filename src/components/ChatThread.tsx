@@ -2,6 +2,7 @@ import { AlertTriangle, LoaderCircle } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ChatResponse } from "../../shared/contracts";
 import type { ThreadEntry } from "../hooks/useInsightsChat";
+import { ActionProposal } from "./ActionProposal";
 import { AnswerMarkdown } from "./AnswerMarkdown";
 import { CitationList } from "./CitationList";
 import { PromptPills } from "./PromptPills";
@@ -14,6 +15,8 @@ interface ChatThreadProps {
   interruptedQuestion?: string;
   onAsk: (query: string) => void;
   onRetry: (query: string) => void;
+  onConfirmAction: (entryId: string) => Promise<string | null>;
+  onDismissAction: (entryId: string) => void;
 }
 
 const PENDING_STAGES = ["Searching Linear and GitHub…", "Ranking the most relevant sources…", "Asking Grok to summarise…"];
@@ -26,7 +29,18 @@ function sourceBadge(response: ChatResponse) {
   return <span className="badge badge-live">Live data</span>;
 }
 
-function AssistantCard({ entryId, response, onAsk, disabled }: { entryId: string; response: ChatResponse; onAsk: (q: string) => void; disabled: boolean }) {
+interface AssistantCardProps {
+  entryId: string;
+  response: ChatResponse;
+  onAsk: (q: string) => void;
+  disabled: boolean;
+  /** Proposals are only actionable on the newest answer. */
+  isLatest: boolean;
+  onConfirmAction: (entryId: string) => Promise<string | null>;
+  onDismissAction: (entryId: string) => void;
+}
+
+function AssistantCard({ entryId, response, onAsk, disabled, isLatest, onConfirmAction, onDismissAction }: AssistantCardProps) {
   const anchorPrefix = `src-${entryId}`;
   const citationIndex = useMemo(() => new Map(response.citations.map((c, i) => [c.id, i + 1])), [response.citations]);
   const followUps = response.relatedQuestions.map((q, i) => ({ id: `${entryId}-f${i}`, label: q, query: q }));
@@ -39,6 +53,14 @@ function AssistantCard({ entryId, response, onAsk, disabled }: { entryId: string
         {sourceBadge(response)}
       </header>
       <AnswerMarkdown text={response.reply} citationIndex={citationIndex} anchorPrefix={anchorPrefix} />
+      {response.proposedAction && isLatest ? (
+        <ActionProposal
+          action={response.proposedAction}
+          onConfirm={() => onConfirmAction(entryId)}
+          onCancel={() => onDismissAction(entryId)}
+          disabled={disabled}
+        />
+      ) : null}
       <CitationList citations={response.citations} anchorPrefix={anchorPrefix} />
       {followUps.length ? (
         <section className="followups" aria-label="Suggested follow-ups">
@@ -71,7 +93,7 @@ function PendingCard() {
   );
 }
 
-export function ChatThread({ entries, isSending, interruptedQuestion, onAsk, onRetry }: ChatThreadProps) {
+export function ChatThread({ entries, isSending, interruptedQuestion, onAsk, onRetry, onConfirmAction, onDismissAction }: ChatThreadProps) {
   const threadRef = useRef<HTMLElement>(null);
 
   // Keep the latest question pinned at the top so its answer reads beneath it.
@@ -91,7 +113,18 @@ export function ChatThread({ entries, isSending, interruptedQuestion, onAsk, onR
           );
         }
         if (entry.role === "assistant") {
-          return <AssistantCard key={entry.id} entryId={entry.id} response={entry.response} onAsk={onAsk} disabled={isSending} />;
+          return (
+            <AssistantCard
+              key={entry.id}
+              entryId={entry.id}
+              response={entry.response}
+              onAsk={onAsk}
+              disabled={isSending}
+              isLatest={entry === entries.at(-1)}
+              onConfirmAction={onConfirmAction}
+              onDismissAction={onDismissAction}
+            />
+          );
         }
         return (
           <div key={entry.id} className="error-card" role="alert">

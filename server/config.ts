@@ -15,6 +15,8 @@ export interface Config {
   allowFixtures: boolean;
   xai: { apiKey: string | null; model: string; timeoutMs: number };
   linear: { apiKey: string | null; teamId: string | null; teamKey: string };
+  /** Write-scoped Linear key for confirmed ticket moves. Absent = actions off. */
+  actions: { linearApiKey: string | null; allowedStates: string[]; secret: string | null };
   github: { token: string | null; repos: string[]; branch: string };
 }
 
@@ -76,6 +78,15 @@ export function loadConfig(env: Env = process.env): Config {
       apiKey: str(env, "LINEAR_API_KEY"),
       teamId: str(env, "LINEAR_TEAM_ID"),
       teamKey: str(env, "LINEAR_TEAM_KEY") ?? "LIQ",
+    },
+    actions: {
+      linearApiKey: str(env, "LINEAR_ACTIONS_API_KEY"),
+      allowedStates: (str(env, "LIQUID_ACTIONS_ALLOWED_STATES") ?? "In Progress")
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean),
+      // Signs confirmation tokens: the session secret on hosted deploys, the demo token locally.
+      secret: atLeast(str(env, "LIQUID_SESSION_SECRET"), MIN_SESSION_SECRET_CHARS) ?? demoToken,
     },
     github: {
       token: str(env, "GITHUB_TOKEN"),

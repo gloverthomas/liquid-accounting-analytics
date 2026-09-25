@@ -88,4 +88,15 @@ describe("conversationStore", () => {
     expect(relativeTime(now - 30 * 3_600_000, now)).toBe("Yesterday");
     expect(relativeTime(now - 10 * 86_400_000, now)).toMatch(/15/);
   });
+
+  it("keeps valid action proposals and strips malformed ones", () => {
+    const action = { kind: "linear_transition", issueId: "LIQ-17", issueTitle: "t", url: "https://x", fromState: "Todo", toState: "In Progress", token: "tok", expiresAt: 1 };
+    const withAction = (proposedAction: unknown) =>
+      conv("c", 1, { entries: [{ id: "a", role: "assistant", response: { ...chatResponse(), proposedAction } as never }] });
+    const [good] = parseConversations(JSON.stringify([withAction(action)]));
+    expect(good.entries[0].role === "assistant" && good.entries[0].response.proposedAction).toEqual(action);
+    const [bad] = parseConversations(JSON.stringify([withAction({ kind: "rm -rf", token: 1 })]));
+    expect(bad.entries[0].role === "assistant" && bad.entries[0].response.proposedAction).toBeUndefined();
+  });
 });
+

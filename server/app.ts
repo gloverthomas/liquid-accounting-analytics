@@ -3,6 +3,7 @@
  * Vercel function are thin adapters around this, so both enforce identical rules.
  */
 import { HISTORY_MAX_TURNS, MESSAGE_MAX_CHARS, MESSAGE_MIN_CHARS, type ChatResponse, type ChatTurn } from "../shared/contracts.js";
+import { ActionError, executeTransition } from "./actions/linearTransition.js";
 import { accessCodeMatches, authenticate, buildSessionCookie, createSessionToken } from "./auth.js";
 import { sessionAuthEnabled, type Config } from "./config.js";
 import { createXaiClient, type GrokClient } from "./grok/client.js";
@@ -54,6 +55,7 @@ function connectorFlags(config: Config) {
     posthog: false,
     sentry: false,
     fixtures: config.allowFixtures,
+    actions: Boolean(config.actions.linearApiKey),
   };
 }
 
@@ -97,6 +99,22 @@ export function createApp(deps: AppDeps): AppHandler {
     return json(200, ctx.requestId, payload);
   }
 
+  async function handleTransition(request: Request, ctx: RequestContext): Promise<Response> {
+    if (!limiter.allow(RATE_LIMITS.action, ctx.ip)) return errorResponse(429, ctx.requestId, "rate_limit_exceeded");
+    const body = await readJsonBody(request);
+    const started = now();
+    try {
+      const answer = await executeTransition(body.token, config, { fetch: fetchImpl, now });
+      return json(200, ctx.requestId, { ...answer, latencyMs: now() - started });
+    } catch (error) {
+      if (error instanceof ActionError) {
+        logEvent("action_refused", { requestId: ctx.requestId, error: error.code });
+        return errorResponse(error.status, ctx.requestId, error.code);
+      }
+      throw error;
+    }
+  }
+
   async function handleSession(request: Request, ctx: RequestContext): Promise<Response> {
     if (request.method === "DELETE") return noContent(ctx.requestId, { "Set-Cookie": buildSessionCookie(config, null) });
     if (!sessionAuthEnabled(config) || !config.sessionSecret) return errorResponse(503, ctx.requestId, "auth_not_configured");
@@ -129,6 +147,7 @@ export function createApp(deps: AppDeps): AppHandler {
     }
 
     if (method === "POST" && path === "/api/v1/insights/chat") return handleChat(request, ctx);
+    if (method === "POST" && path === "/api/v1/actions/linear-transition") return handleTransition(request, ctx);
     if (method !== "GET") return errorResponse(405, ctx.requestId, "method_not_allowed");
 
     switch (path) {

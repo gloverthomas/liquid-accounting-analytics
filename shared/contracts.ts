@@ -40,7 +40,22 @@ export interface RetrievalMeta {
   itemCount: number;
 }
 
-export type Provider = `grok:${string}` | "fixture" | "digest";
+export type Provider = `grok:${string}` | "fixture" | "digest" | "action";
+
+/**
+ * A change the viewer must confirm with a click. Nothing happens until the
+ * UI posts `token` to the action endpoint.
+ */
+export interface ProposedAction {
+  kind: "linear_transition";
+  issueId: string;
+  issueTitle: string;
+  url: string;
+  fromState: string;
+  toState: string;
+  token: string;
+  expiresAt: number;
+}
 
 export interface ChatResponse {
   requestId: string;
@@ -50,6 +65,7 @@ export interface ChatResponse {
   provider: Provider;
   retrievalMeta: RetrievalMeta;
   latencyMs: number;
+  proposedAction?: ProposedAction;
 }
 
 export interface Organisation {

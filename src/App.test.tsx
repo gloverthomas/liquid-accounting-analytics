@@ -135,4 +135,76 @@ describe("App", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Try again" }));
     await waitFor(() => expect(screen.getByRole("heading", { name: /What do you want to know/ })).toBeInTheDocument());
   });
+
+  describe("ticket moves", () => {
+    const proposal = {
+      kind: "linear_transition" as const,
+      issueId: "LIQ-17",
+      issueTitle: "Notifications dead in Reporting",
+      url: "https://linear.app/x/LIQ-17",
+      fromState: "Todo",
+      toState: "In Progress",
+      token: "signed-token",
+      expiresAt: Date.now() + 300_000,
+    };
+    const proposed = chatResponse({ provider: "action", reply: "**Ready to move LIQ-17 from Todo to In Progress.** [linear:LIQ-24]", relatedQuestions: [], proposedAction: proposal });
+    const moved = chatResponse({ provider: "action", reply: "**Moved LIQ-17 to In Progress.**", relatedQuestions: [] });
+
+    it("shows a confirm card, and only moves the ticket after Confirm", async () => {
+      let transitions = 0;
+      route({
+        "/api/v1/orgs": () => jsonRes(ORGS),
+        "/api/v1/suggested-prompts": () => jsonRes(PROMPTS),
+        "/api/v1/insights/chat": () => jsonRes(proposed),
+        "/api/v1/actions/linear-transition": () => {
+          transitions++;
+          return jsonRes(moved);
+        },
+      });
+      render(<App />);
+      await userEvent.type(await screen.findByRole("textbox"), "Move LIQ-17 to In Progress{Enter}");
+      const card = await screen.findByRole("region", { name: "Confirm moving LIQ-17" });
+      expect(within(card).getByText("Todo")).toBeInTheDocument();
+      expect(transitions).toBe(0);
+
+      await userEvent.click(within(card).getByRole("button", { name: "Move to In Progress" }));
+      expect(await screen.findByText("Moved LIQ-17 to In Progress.")).toBeInTheDocument();
+      expect(transitions).toBe(1);
+      const call = fetchMock.mock.calls.find(([p]) => p === "/api/v1/actions/linear-transition")!;
+      expect(JSON.parse(String(call[1]!.body))).toEqual({ token: "signed-token" });
+      // The card is retired so it can't be clicked twice.
+      expect(screen.queryByRole("region", { name: "Confirm moving LIQ-17" })).toBeNull();
+    });
+
+    it("Cancel retires the card without calling Linear", async () => {
+      route({ "/api/v1/orgs": () => jsonRes(ORGS), "/api/v1/suggested-prompts": () => jsonRes(PROMPTS), "/api/v1/insights/chat": () => jsonRes(proposed) });
+      render(<App />);
+      await userEvent.type(await screen.findByRole("textbox"), "Move LIQ-17 to In Progress{Enter}");
+      const card = await screen.findByRole("region", { name: "Confirm moving LIQ-17" });
+      await userEvent.click(within(card).getByRole("button", { name: "Cancel" }));
+      expect(screen.queryByRole("region", { name: "Confirm moving LIQ-17" })).toBeNull();
+      expect(fetchMock.mock.calls.some(([p]) => p === "/api/v1/actions/linear-transition")).toBe(false);
+    });
+
+    it("an expired confirmation becomes a Try again card; a server error stays inline", async () => {
+      let status = 503;
+      route({
+        "/api/v1/orgs": () => jsonRes(ORGS),
+        "/api/v1/suggested-prompts": () => jsonRes(PROMPTS),
+        "/api/v1/insights/chat": () => jsonRes(proposed),
+        "/api/v1/actions/linear-transition": () => jsonRes({ requestId: "r", error: status === 410 ? "confirmation_expired" : "internal_error" }, status),
+      });
+      render(<App />);
+      await userEvent.type(await screen.findByRole("textbox"), "Move LIQ-17 to In Progress{Enter}");
+      const card = await screen.findByRole("region", { name: "Confirm moving LIQ-17" });
+      await userEvent.click(within(card).getByRole("button", { name: "Move to In Progress" }));
+      expect(await within(card).findByRole("alert")).toHaveTextContent(/couldn't answer/);
+
+      status = 410;
+      await userEvent.click(within(card).getByRole("button", { name: "Move to In Progress" }));
+      expect(await screen.findByText(/confirmation expired/)).toBeInTheDocument();
+      expect(screen.queryByRole("region", { name: "Confirm moving LIQ-17" })).toBeNull();
+      expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
+    });
+  });
 });

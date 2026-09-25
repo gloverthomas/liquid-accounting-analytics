@@ -3,7 +3,8 @@
  * citation mapping. Falls back to a canned sample answer or a deterministic
  * digest — never to an answer that contradicts the retrieved sources.
  */
-import type { ChatTurn, Citation, Provider, RetrievalMeta } from "../shared/contracts.js";
+import type { ChatTurn, Citation, ProposedAction, Provider, RetrievalMeta } from "../shared/contracts.js";
+import { detectTicketAction, proposeTransition } from "./actions/linearTransition.js";
 import type { Config } from "./config.js";
 import { fixtureAnswerFor } from "./fixtures/responses.js";
 import type { GrokClient, GrokMessage } from "./grok/client.js";
@@ -20,6 +21,7 @@ export interface InsightAnswer {
   relatedQuestions: string[];
   provider: Provider;
   retrievalMeta: RetrievalMeta;
+  proposedAction?: ProposedAction;
 }
 
 export interface InsightDeps extends RetrievalDeps {
@@ -92,6 +94,10 @@ function fallbackAnswer(plan: RetrievalPlan, items: RetrievedItem[], meta: Retri
 }
 
 export async function answerQuestion(message: string, history: ChatTurn[], config: Config, deps: InsightDeps): Promise<InsightAnswer> {
+  // Requests to change a ticket never reach Grok: rules detect them and the viewer must confirm.
+  const action = detectTicketAction(message);
+  if (action) return proposeTransition(action, config, deps);
+
   const plan = planRetrieval(message, config.github.repos);
   const { context, items, meta } = await runRetrieval(plan, config, deps);
 

@@ -6,6 +6,7 @@ const CONNECTOR_NAMES: Record<string, string> = { linear: "Linear", github: "Git
 function providerLabel(provider: ChatResponse["provider"]): string {
   if (provider === "fixture") return "Sample answer (Grok not used)";
   if (provider === "digest") return "Source list (Grok not used)";
+  if (provider === "action") return "Ticket action (rules, no AI; changes need your confirmation)";
   return `Grok · ${provider.slice("grok:".length)}`;
 }
 
