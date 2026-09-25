@@ -25,9 +25,10 @@ Output ONLY a JSON object (no markdown fences, no prose around it) with exactly 
 /** Per-question answer shape, chosen by the router and sent with the question. */
 export const ANSWER_STYLES = {
   overview: `ANSWER STYLE: overview.
-- Start with a short overview paragraph (2-4 sentences, plain English): open with a **bold one-line headline**, then the main themes, what's resolved vs still open, and any risk. Cite as you go.
+- Start with a short overview paragraph (2-4 sentences, plain English): open with a **bold one-line headline**, then the main themes, what's resolved vs still open, and any risk. Cite at most 3 sources in this paragraph; never string many citations together (the Key items carry the rest).
 - Then a line "**Key items**" followed by 3-8 bullets, most important first. Each bullet: **ID or repo #PR: short title** (exact current state) — one line on why it matters — [its id].
-- If both resolved and open items matter, say which is which. Cite every item you mention; don't list bare ids without titles.`,
+- If both resolved and open items matter, say which is which. Cite every item you mention; don't list bare ids without titles.
+- Put the "citations" array in the same order as the Key items, and only include sources you actually cited.`,
   direct: `ANSWER STYLE: direct.
 - Lead with a one-sentence answer in **bold**, then 1-5 short bullets with **bold labels** and citations.`,
 } as const;
