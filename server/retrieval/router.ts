@@ -6,7 +6,7 @@
 export type Intent = "issue_status" | "ci_health" | "trend" | "problems" | "merged_prs" | "linear_overview" | "general";
 
 /** Server-computed charts a question can ask for. */
-export type ChartKind = "prs_per_day" | "tickets_by_state" | "opened_vs_closed" | "ci_history" | "usage_trend" | "bff_health";
+export type ChartKind = "prs_per_day" | "tickets_by_state" | "opened_vs_closed" | "ci_history" | "usage_trend" | "bff_health" | "assistant_usage";
 
 /** "overview" = narrative summary + key items; "direct" = short answer to a specific question. */
 export type AnswerStyle = "overview" | "direct";
@@ -62,7 +62,9 @@ function pickCharts(message: string, intent: Intent, linearStates: string[]): Ch
   if (TICKET_NOUNS.test(message) && OPEN_CLOSE.test(message) && COMPARE.test(message)) charts.push("opened_vs_closed");
   const bffQuestion = BFF_WORDS.test(message);
   if ((intent === "ci_health" || CI_WORDS.test(message)) && CI_HISTORY.test(message) && (!bffQuestion || EXPLICIT_CI.test(message))) charts.push("ci_history");
-  if (PRODUCT_WORDS.test(message) && (wantsChart || GOING.test(message) || intent === "trend")) charts.push("usage_trend");
+  const usageAsk = PRODUCT_WORDS.test(message) && (wantsChart || GOING.test(message) || intent === "trend");
+  // "AI Assistant usage" gets the assistant chart; other usage questions get general product activity.
+  if (usageAsk) charts.push(/\b(ai )?assistant\b/i.test(message) ? "assistant_usage" : "usage_trend");
   if (BFF_WORDS.test(message) && (wantsChart || GOING.test(message) || /\bhow often|errors?|failing\b/i.test(message))) charts.push("bff_health");
   return charts;
 }

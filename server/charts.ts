@@ -218,8 +218,8 @@ export function bffHealth(rows: PosthogRow[], days: number, nowMs: number, timeZ
   const b = makeBuckets(days, nowMs, timeZone);
   const bff = rows.filter((r) => r.event === "bff_status");
   const series: ChartSeries[] = [
-    { key: "connected", name: "Connected", color: "good", values: sumBy(b, bff.filter((r) => r.connected === "true")) },
-    { key: "disconnected", name: "Not connected", color: "critical", values: sumBy(b, bff.filter((r) => r.connected === "false")) },
+    { key: "connected", name: "Connected", color: "good", values: sumBy(b, bff.filter((r) => r.detail === "true")) },
+    { key: "disconnected", name: "Not connected", color: "critical", values: sumBy(b, bff.filter((r) => r.detail === "false")) },
   ];
   if (!series.some((s) => s.values.some(Boolean))) return null;
   return {
@@ -230,6 +230,26 @@ export function bffHealth(rows: PosthogRow[], days: number, nowMs: number, timeZ
     categories: b.labels,
     series,
     unit: "checks",
+    sample: false,
+  };
+}
+
+export function assistantUsage(rows: PosthogRow[], days: number, nowMs: number, timeZone: string): ChartSpec | null {
+  const b = makeBuckets(days, nowMs, timeZone);
+  const msgs = rows.filter((r) => r.event === "assistant_message_sent");
+  const series: ChartSeries[] = [
+    { key: "answered", name: "Answered", color: "good", values: sumBy(b, msgs.filter((r) => r.detail === "answered")) },
+    { key: "failed", name: "Failed", color: "critical", values: sumBy(b, msgs.filter((r) => r.detail === "failed")) },
+  ];
+  if (!series.some((s) => s.values.some(Boolean))) return null;
+  return {
+    id: "assistant_usage",
+    kind: "stacked",
+    title: `AI Assistant messages per ${b.unit}`,
+    subtitle: `${windowNote(days, b.unit, timeZone)} · Core + Reporting · PostHog assistant_message_sent`,
+    categories: b.labels,
+    series,
+    unit: "messages",
     sample: false,
   };
 }
@@ -249,6 +269,8 @@ export function buildCharts(plan: RetrievalPlan, inputs: ChartInputs, nowMs: num
         return inputs.posthog ? usageTrend(inputs.posthog, plan.sinceDays, nowMs, timeZone) : null;
       case "bff_health":
         return inputs.posthog ? bffHealth(inputs.posthog, plan.sinceDays, nowMs, timeZone) : null;
+      case "assistant_usage":
+        return inputs.posthog ? assistantUsage(inputs.posthog, plan.sinceDays, nowMs, timeZone) : null;
     }
   });
   return charts.filter((c): c is ChartSpec => c !== null);

@@ -1,6 +1,6 @@
 /** PostHog: fixed aggregate query, host allowlist, summary text, charts and routing. */
 import { describe, expect, it } from "vitest";
-import { bffHealth, usageTrend } from "../../server/charts.js";
+import { assistantUsage, bffHealth, usageTrend } from "../../server/charts.js";
 import { loadConfig } from "../../server/config.js";
 import { TtlCache } from "../../server/retrieval/cache.js";
 import { runRetrieval } from "../../server/retrieval/index.js";
@@ -11,13 +11,13 @@ import { jsonResponse, makeConfig, mockFetch } from "../helpers.js";
 const NOW = Date.parse("2026-09-25T04:00:00Z");
 const TZ = "Australia/Sydney";
 const ROWS: PosthogRow[] = [
-  { hour: "2026-09-24T07:00:00Z", event: "$pageview", app: "core", connected: "", n: 3 },
-  { hour: "2026-09-24T07:00:00Z", event: "product_navigation", app: "core", connected: "", n: 3 },
-  { hour: "2026-09-24T07:00:00Z", event: "$pageview", app: "reporting", connected: "", n: 2 },
-  { hour: "2026-09-24T07:00:00Z", event: "bff_status", app: "core", connected: "true", n: 4 },
-  { hour: "2026-09-24T08:00:00Z", event: "bff_status", app: "reporting", connected: "false", n: 1 },
+  { hour: "2026-09-24T07:00:00Z", event: "$pageview", app: "core", detail: "", n: 3 },
+  { hour: "2026-09-24T07:00:00Z", event: "product_navigation", app: "core", detail: "", n: 3 },
+  { hour: "2026-09-24T07:00:00Z", event: "$pageview", app: "reporting", detail: "", n: 2 },
+  { hour: "2026-09-24T07:00:00Z", event: "bff_status", app: "core", detail: "true", n: 4 },
+  { hour: "2026-09-24T08:00:00Z", event: "bff_status", app: "reporting", detail: "false", n: 1 },
 ];
-const RAW = ROWS.map((r) => [r.hour, r.event, r.app, r.connected, r.n]);
+const RAW = ROWS.map((r) => [r.hour, r.event, r.app, r.detail, r.n]);
 const DEPS = { apiKey: "phx_test", projectId: "123", host: "https://us.posthog.com" };
 
 describe("fetchPosthogActivity", () => {
@@ -44,9 +44,32 @@ describe("normalizePosthogActivity", () => {
   it("leads with what isn't tracked, then aggregates per event and app", () => {
     const item = normalizePosthogActivity(ROWS, 14, DEPS, "2026-09-25T00:00:00Z");
     expect(item.citation).toMatchObject({ id: "posthog:activity:14d", status: "live", url: "https://us.posthog.com/project/123/activity/explore" });
-    expect(item.text).toMatch(/^\[posthog:activity:14d\] NOT TRACKED: AI Assistant usage/);
+    expect(item.text).toMatch(/^\[posthog:activity:14d\] NOT TRACKED YET: no assistant_message_sent events/);
     expect(item.text).toContain("$pageview 5 (core 3, reporting 2)");
     expect(item.text).toContain("BFF status: 5 checks, 1 reported NOT connected (core 0, reporting 1)");
+  });
+});
+
+describe("assistant tracking", () => {
+  const withAssistant: PosthogRow[] = [
+    ...ROWS,
+    { hour: "2026-09-25T01:00:00Z", event: "assistant_message_sent", app: "core", detail: "answered", n: 4 },
+    { hour: "2026-09-25T01:00:00Z", event: "assistant_message_sent", app: "reporting", detail: "failed", n: 3 },
+  ];
+
+  it("reports assistant messages and failures once events exist", () => {
+    const item = normalizePosthogActivity(withAssistant, 14, DEPS, "2026-09-25T02:00:00Z");
+    expect(item.text).toMatch(/^\[posthog:activity:14d\] AI Assistant messages: 7 \(core 4, reporting 3\); 3 failed \(core 0, reporting 3\)\./);
+    expect(item.text).not.toContain("NOT TRACKED");
+  });
+
+  it("charts answered vs failed per day", () => {
+    const chart = assistantUsage(withAssistant, 7, NOW, TZ)!;
+    expect(chart.series.map((s) => [s.name, s.color, s.values.reduce((a, v) => a + v, 0)])).toEqual([
+      ["Answered", "good", 4],
+      ["Failed", "critical", 3],
+    ]);
+    expect(assistantUsage(ROWS, 7, NOW, TZ)).toBeNull();
   });
 });
 
@@ -79,7 +102,7 @@ describe("PostHog config and routing", () => {
 
   it.each([
     ["How has product usage changed over the last 2 weeks?", ["usage_trend"]],
-    ["Is AI Assistant usage going up?", ["usage_trend"]],
+    ["Is AI Assistant usage going up?", ["assistant_usage"]],
     ["Is the BFF disconnecting? show me connection checks per day", ["bff_health"]],
     ["How often has assistant-unit failed over the last 2 weeks?", ["ci_history"]],
   ])("%s → %j", (q, charts) => {

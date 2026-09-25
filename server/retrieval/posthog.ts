@@ -5,7 +5,15 @@
  */
 import { CONNECTOR_TIMEOUT_MS, type FetchLike, type RetrievedItem } from "./types.js";
 
-export const POSTHOG_EVENTS = ["$pageview", "product_navigation", "report_opened", "bff_status", "create_dialog_opened", "invoice_deep_link_miss"] as const;
+export const POSTHOG_EVENTS = [
+  "$pageview",
+  "product_navigation",
+  "report_opened",
+  "bff_status",
+  "create_dialog_opened",
+  "invoice_deep_link_miss",
+  "assistant_message_sent",
+] as const;
 const ACTIVITY_EVENTS = new Set(["$pageview", "product_navigation", "report_opened", "create_dialog_opened"]);
 const MAX_DAYS = 30;
 const ROW_LIMIT = 5000;
@@ -22,8 +30,8 @@ export interface PosthogRow {
   hour: string;
   event: string;
   app: string;
-  /** "true"/"false" for bff_status, "" otherwise. */
-  connected: string;
+  /** bff_status: "true"/"false"; assistant_message_sent: "answered"/"failed"; otherwise "". */
+  detail: string;
   n: number;
 }
 
@@ -32,11 +40,11 @@ function activityQuery(days: number): string {
   const events = POSTHOG_EVENTS.map((e) => `'${e}'`).join(", ");
   return `SELECT toStartOfHour(timestamp) AS hour, event,
   coalesce(properties.source, properties.app, if(properties.$host LIKE '%reporting%', 'reporting', 'core')) AS app,
-  if(event = 'bff_status', toString(properties.connected), '') AS connected,
+  multiIf(event = 'bff_status', toString(properties.connected), event = 'assistant_message_sent', toString(properties.outcome), '') AS detail,
   count() AS n
 FROM events
 WHERE event IN (${events}) AND timestamp > now() - INTERVAL ${window} DAY
-GROUP BY hour, event, app, connected ORDER BY hour LIMIT ${ROW_LIMIT}`;
+GROUP BY hour, event, app, detail ORDER BY hour LIMIT ${ROW_LIMIT}`;
 }
 
 export async function fetchPosthogActivity(days: number, deps: PosthogDeps): Promise<PosthogRow[]> {
@@ -52,7 +60,7 @@ export async function fetchPosthogActivity(days: number, deps: PosthogDeps): Pro
     hour: String(r[0]),
     event: String(r[1]),
     app: String(r[2] ?? "core").toLowerCase() === "reporting" ? "reporting" : "core",
-    connected: String(r[3] ?? ""),
+    detail: String(r[3] ?? ""),
     n: Number(r[4]) || 0,
   }));
 }
@@ -67,7 +75,12 @@ export function normalizePosthogActivity(rows: PosthogRow[], days: number, deps:
     return `${e} ${sum(ev)} (core ${sum(ev.filter((r) => r.app === "core"))}, reporting ${sum(ev.filter((r) => r.app === "reporting"))})`;
   }).join("; ");
   const bff = rows.filter((r) => r.event === "bff_status");
-  const disconnected = bff.filter((r) => r.connected === "false");
+  const disconnected = bff.filter((r) => r.detail === "false");
+  const assistant = rows.filter((r) => r.event === "assistant_message_sent");
+  const failed = assistant.filter((r) => r.detail === "failed");
+  const assistantLine = assistant.length
+    ? `AI Assistant messages: ${sum(assistant)} (core ${sum(assistant.filter((r) => r.app === "core"))}, reporting ${sum(assistant.filter((r) => r.app === "reporting"))}); ${sum(failed)} failed (core ${sum(failed.filter((r) => r.app === "core"))}, reporting ${sum(failed.filter((r) => r.app === "reporting"))}).`
+    : "NOT TRACKED YET: no assistant_message_sent events recorded in this window. Tracking was added to Core and Reporting on 26 Sep 2026 (PR #11 in each) and appears once those deploy; until then assistant usage CANNOT be measured, and the numbers below are general product activity, not assistant usage.";
   const activity = rows.filter((r) => ACTIVITY_EVENTS.has(r.event));
   const daysActive = new Set(activity.map((r) => r.hour.slice(0, 10))).size;
   return {
@@ -79,7 +92,7 @@ export function normalizePosthogActivity(rows: PosthogRow[], days: number, deps:
       url: `${deps.host}/project/${deps.projectId}/activity/explore`,
       status: "live",
     },
-    text: `[${id}] NOT TRACKED: AI Assistant usage has no PostHog event, so assistant usage/adoption CANNOT be measured here — the numbers below are general product activity, not assistant usage. PostHog (allowlisted, aggregated events; no personal data), last ${days} days: ${byEvent}. Product activity events total ${sum(activity)} across ${daysActive} active day(s). BFF status: ${sum(bff)} checks, ${sum(disconnected)} reported NOT connected (core ${sum(disconnected.filter((r) => r.app === "core"))}, reporting ${sum(disconnected.filter((r) => r.app === "reporting"))}).`,
+    text: `[${id}] ${assistantLine} PostHog (allowlisted, aggregated events; no personal data), last ${days} days: ${byEvent}. Product activity events total ${sum(activity)} across ${daysActive} active day(s). BFF status: ${sum(bff)} checks, ${sum(disconnected)} reported NOT connected (core ${sum(disconnected.filter((r) => r.app === "core"))}, reporting ${sum(disconnected.filter((r) => r.app === "reporting"))}).`,
     updatedAt: activity.at(-1)?.hour ?? nowIso,
     mentions: [],
   };
