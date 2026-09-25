@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
@@ -19,6 +19,7 @@ function route(handlers: Record<string, () => Response>) {
 }
 
 beforeEach(() => {
+  localStorage.clear();
   fetchMock.mockReset();
   vi.stubGlobal("fetch", fetchMock);
 });
@@ -39,7 +40,8 @@ describe("App", () => {
     await userEvent.click(screen.getByRole("button", { name: /Open LIQ-24 status/ }));
 
     expect(await screen.findByRole("article", { name: "Liquid Insights answer" })).toBeInTheDocument();
-    expect(screen.getByText("What's the status of LIQ-24?")).toBeInTheDocument();
+    expect(within(screen.getByRole("region", { name: "Conversation" })).getByText("What's the status of LIQ-24?")).toBeInTheDocument();
+    expect(within(screen.getByRole("complementary", { name: "Chat history" })).getByText("What's the status of LIQ-24?")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /LIQ-24 AI Assistant parity/ })).toHaveAttribute("href", "https://linear.app/x/LIQ-24");
     expect(screen.getByText("Live data")).toBeInTheDocument();
     expect(screen.getByPlaceholderText("Ask a follow-up…")).toBeInTheDocument();
@@ -60,8 +62,34 @@ describe("App", () => {
     const [, init] = fetchMock.mock.calls.find(([p]) => p === "/api/v1/insights/chat")!;
     expect(JSON.parse(String(init!.body)).message).toBe("Line one\nline two");
 
+    // Top-right "New conversation" returns to the hero; the chat stays in the sidebar history.
     await userEvent.click(screen.getByRole("button", { name: /New conversation/ }));
     expect(await screen.findByRole("heading", { name: /What do you want to know/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /New conversation/ })).toBeDisabled();
+    const history = screen.getByRole("complementary", { name: "Chat history" });
+    await userEvent.click(within(history).getByRole("button", { name: /^Line one line two/ }));
+    expect(await screen.findByText("Sample data")).toBeInTheDocument();
+
+    await userEvent.click(within(history).getByRole("button", { name: /Delete/ }));
+    expect(await screen.findByRole("heading", { name: /What do you want to know/ })).toBeInTheDocument();
+    expect(within(history).getByText(/saved in this browser only/)).toBeInTheDocument();
+  });
+
+  it("offers to re-ask a question that was saved without an answer", async () => {
+    localStorage.setItem(
+      "liquid-insights:conversations:v1",
+      JSON.stringify([{ id: "c1", title: "Unanswered", createdAt: 1, updatedAt: 2, entries: [{ id: "u", role: "user", content: "Unanswered" }] }]),
+    );
+    route({
+      "/api/v1/orgs": () => jsonRes(ORGS),
+      "/api/v1/suggested-prompts": () => jsonRes(PROMPTS),
+      "/api/v1/insights/chat": () => jsonRes(chatResponse()),
+    });
+    render(<App />);
+    await userEvent.click(await screen.findByRole("button", { name: /^Unanswered/ }));
+    await userEvent.click(await screen.findByRole("button", { name: "Ask again" }));
+    expect(await screen.findByRole("article", { name: "Liquid Insights answer" })).toBeInTheDocument();
+    localStorage.clear();
   });
 
 

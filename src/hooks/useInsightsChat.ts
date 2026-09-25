@@ -1,19 +1,22 @@
-/** Session-only chat state (MVP: nothing persisted). */
-import { useCallback, useEffect, useRef, useState } from "react";
-import { HISTORY_MAX_TURNS, MESSAGE_MAX_CHARS, MESSAGE_MIN_CHARS, type ChatResponse, type ChatTurn } from "../../shared/contracts";
+/**
+ * Chat actions. Entries live in the conversation store; every request writes
+ * back to the conversation it was sent from (by id), so a reply still lands
+ * if the viewer has switched to another chat in the meantime.
+ */
+import { useCallback, useEffect, useRef } from "react";
+import { HISTORY_MAX_TURNS, MESSAGE_MAX_CHARS, MESSAGE_MIN_CHARS, type ChatTurn } from "../../shared/contracts";
 import { api, describeError } from "../lib/api";
+import type { ConversationsApi, ThreadEntry } from "./useConversations";
 
-export type ThreadEntry =
-  | { id: string; role: "user"; content: string }
-  | { id: string; role: "assistant"; response: ChatResponse }
-  | { id: string; role: "error"; message: string; retryOf: string };
+export type { ThreadEntry } from "./useConversations";
+
+type Store = Pick<ConversationsApi, "entriesOf" | "update" | "isPending" | "setPending">;
 
 export interface InsightsChat {
   entries: ThreadEntry[];
   isSending: boolean;
   send: (message: string) => Promise<void>;
   retry: (message: string) => Promise<void>;
-  reset: () => void;
 }
 
 let counter = 0;
@@ -35,66 +38,62 @@ export function toHistory(entries: ThreadEntry[]): ChatTurn[] {
     .slice(-HISTORY_MAX_TURNS);
 }
 
-export function useInsightsChat(orgId: string | undefined): InsightsChat {
-  const [entries, setEntries] = useState<ThreadEntry[]>([]);
-  const [isSending, setIsSending] = useState(false);
-  const entriesRef = useRef(entries);
-  const abortRef = useRef<AbortController | null>(null);
+/** In-flight requests live for the page lifetime, keyed by conversation — not by what's on screen. */
+const inFlight = new Map<string, AbortController>();
 
-  // Single write path so the ref (read by async callbacks) never lags state.
-  const commit = useCallback((update: (prev: ThreadEntry[]) => ThreadEntry[]) => {
-    entriesRef.current = update(entriesRef.current);
-    setEntries(entriesRef.current);
-  }, []);
+export function abortConversation(id: string): void {
+  inFlight.get(id)?.abort();
+  inFlight.delete(id);
+}
 
-  useEffect(() => () => abortRef.current?.abort(), []);
+export function useInsightsChat(orgId: string | undefined, conversationId: string, store: Store): InsightsChat {
+  const storeRef = useRef(store);
+  useEffect(() => {
+    storeRef.current = store;
+  });
 
   const ask = useCallback(
-    async (message: string, history: ChatTurn[]) => {
+    async (id: string, message: string, history: ChatTurn[]) => {
       const controller = new AbortController();
-      abortRef.current?.abort();
-      abortRef.current = controller;
-      setIsSending(true);
+      inFlight.set(id, controller);
+      storeRef.current.setPending(id, true);
       try {
         const response = await api.chat({ message, history, orgId }, controller.signal);
-        commit((prev) => [...prev, { id: nextId("a"), role: "assistant", response }]);
+        storeRef.current.update(id, (prev) => [...prev, { id: nextId("a"), role: "assistant", response }]);
       } catch (error) {
         if (controller.signal.aborted) return;
-        commit((prev) => [...prev, { id: nextId("e"), role: "error", message: describeError(error), retryOf: message }]);
+        storeRef.current.update(id, (prev) => [...prev, { id: nextId("e"), role: "error", message: describeError(error), retryOf: message }]);
       } finally {
-        if (abortRef.current === controller) setIsSending(false);
+        if (inFlight.get(id) === controller) inFlight.delete(id);
+        storeRef.current.setPending(id, false);
       }
     },
-    [orgId, commit],
+    [orgId],
   );
 
   const send = useCallback(
     async (raw: string) => {
       const message = raw.trim();
-      if (!isValidMessage(message) || isSending) return;
-      const history = toHistory(entriesRef.current);
-      commit((prev) => [...prev, { id: nextId("u"), role: "user", content: message }]);
-      await ask(message, history);
+      const id = conversationId;
+      if (!isValidMessage(message) || storeRef.current.isPending(id)) return;
+      const history = toHistory(storeRef.current.entriesOf(id));
+      storeRef.current.update(id, (prev) => [...prev, { id: nextId("u"), role: "user", content: message }]);
+      await ask(id, message, history);
     },
-    [ask, commit, isSending],
+    [ask, conversationId],
   );
 
   const retry = useCallback(
     async (message: string) => {
-      if (isSending) return;
-      // Drop the trailing error card, keep the user's bubble, re-ask.
-      const withoutError = entriesRef.current.filter((entry, i, all) => !(i === all.length - 1 && entry.role === "error"));
-      commit(() => withoutError);
-      await ask(message, toHistory(withoutError.slice(0, -1)));
+      const id = conversationId;
+      if (storeRef.current.isPending(id)) return;
+      // Drop the trailing error card (if any), keep the user's bubble, re-ask.
+      const kept = storeRef.current.entriesOf(id).filter((entry, i, all) => !(i === all.length - 1 && entry.role === "error"));
+      storeRef.current.update(id, () => kept);
+      await ask(id, message, toHistory(kept.slice(0, -1)));
     },
-    [ask, commit, isSending],
+    [ask, conversationId],
   );
 
-  const reset = useCallback(() => {
-    abortRef.current?.abort();
-    setIsSending(false);
-    commit(() => []);
-  }, [commit]);
-
-  return { entries, isSending, send, retry, reset };
+  return { entries: store.entriesOf(conversationId), isSending: store.isPending(conversationId), send, retry };
 }

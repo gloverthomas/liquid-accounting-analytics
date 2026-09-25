@@ -10,6 +10,8 @@ import { SourcesAccordion } from "./SourcesAccordion";
 interface ChatThreadProps {
   entries: ThreadEntry[];
   isSending: boolean;
+  /** Set when the last question never got an answer (e.g. the page was reloaded mid-request). */
+  interruptedQuestion?: string;
   onAsk: (query: string) => void;
   onRetry: (query: string) => void;
 }
@@ -68,7 +70,7 @@ function PendingCard() {
   );
 }
 
-export function ChatThread({ entries, isSending, onAsk, onRetry }: ChatThreadProps) {
+export function ChatThread({ entries, isSending, interruptedQuestion, onAsk, onRetry }: ChatThreadProps) {
   const threadRef = useRef<HTMLElement>(null);
 
   // Keep the latest question pinned at the top so its answer reads beneath it.
@@ -102,6 +104,17 @@ export function ChatThread({ entries, isSending, onAsk, onRetry }: ChatThreadPro
           </div>
         );
       })}
+      {interruptedQuestion ? (
+        <div className="error-card" role="status">
+          <AlertTriangle size={18} aria-hidden="true" />
+          <div>
+            <p>This question didn't get an answer. The page may have been closed while it was loading.</p>
+            <button type="button" className="text-button" onClick={() => onRetry(interruptedQuestion)}>
+              Ask again
+            </button>
+          </div>
+        </div>
+      ) : null}
       {isSending ? <PendingCard /> : null}
     </section>
   );

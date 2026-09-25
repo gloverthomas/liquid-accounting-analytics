@@ -1,11 +1,13 @@
-import { AlertTriangle, RotateCcw } from "lucide-react";
+import { AlertTriangle, PanelLeft, SquarePen } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import type { Organisation, SuggestedPrompt } from "../shared/contracts";
 import { AccessGate } from "./components/AccessGate";
 import { ChatThread } from "./components/ChatThread";
+import { ConversationSidebar } from "./components/ConversationSidebar";
 import { Composer } from "./components/Composer";
 import { InsightsHero } from "./components/InsightsHero";
-import { useInsightsChat } from "./hooks/useInsightsChat";
+import { useConversations, type ConversationsApi } from "./hooks/useConversations";
+import { abortConversation, useInsightsChat } from "./hooks/useInsightsChat";
 import { api, ApiRequestError } from "./lib/api";
 
 type Boot =
@@ -55,51 +57,108 @@ function FullPageMessage({ title, body, onRetry }: { title: string; body: string
   );
 }
 
-function Workspace({ orgs, prompts }: { orgs: Organisation[]; prompts: SuggestedPrompt[] }) {
-  // Single-org MVP: scope chat to the default org (switcher removed from the UI).
-  const orgId = orgs[0]?.id;
+interface ChatPaneProps {
+  orgId: string | undefined;
+  prompts: SuggestedPrompt[];
+  conversationId: string;
+  store: ConversationsApi;
+}
+
+/** One conversation's view. Remounted per conversation so the draft resets. */
+function ChatPane({ orgId, prompts, conversationId, store }: ChatPaneProps) {
   const [draft, setDraft] = useState("");
-  const chat = useInsightsChat(orgId);
+  const chat = useInsightsChat(orgId, conversationId, store);
   const inThread = chat.entries.length > 0;
+  const last = chat.entries.at(-1);
+  // A question saved without an answer (page closed/reloaded mid-request).
+  const interrupted = !chat.isSending && last?.role === "user" ? last.content : undefined;
 
   const ask = (query: string) => {
     setDraft("");
     void chat.send(query);
   };
 
-
   return (
-    <div className="shell" data-mode={inThread ? "thread" : "hero"}>
-      <header className="topbar">
-        <a className="brand" href="/" aria-label="Liquid Insights home">
-          <img src="/brand/liquid-mark.png" alt="" width={28} height={28} />
-          <span className="brand-name">
-            Liquid <span>Insights</span>
-          </span>
-        </a>
-      </header>
-
+    <div className="content" data-mode={inThread ? "thread" : "hero"}>
       <main className="main">
         {inThread ? (
           <>
             <h1 className="visually-hidden">Liquid Insights conversation</h1>
-            <ChatThread entries={chat.entries} isSending={chat.isSending} onAsk={ask} onRetry={(q) => void chat.retry(q)} />
+            <ChatThread
+              entries={chat.entries}
+              isSending={chat.isSending}
+              interruptedQuestion={interrupted}
+              onAsk={ask}
+              onRetry={(q) => void chat.retry(q)}
+            />
           </>
         ) : (
           <InsightsHero draft={draft} onDraftChange={setDraft} onAsk={ask} prompts={prompts} disabled={chat.isSending} />
         )}
       </main>
-
       {inThread ? (
         <div className="dock">
           <Composer value={draft} onChange={setDraft} onSubmit={ask} disabled={chat.isSending} placeholder="Ask a follow-up…" />
-          <div className="dock-actions">
-            <button type="button" className="text-button" onClick={chat.reset}>
-              <RotateCcw size={12} aria-hidden="true" /> New conversation
-            </button>
-          </div>
         </div>
       ) : null}
+    </div>
+  );
+}
+
+function Workspace({ orgs, prompts }: { orgs: Organisation[]; prompts: SuggestedPrompt[] }) {
+  // Single-org MVP: scope chat to the default org.
+  const orgId = orgs[0]?.id;
+  const history = useConversations();
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const closeDrawer = useCallback(() => setDrawerOpen(false), []);
+  const { activeId, remove } = history;
+  const isFresh = history.entriesOf(activeId).length === 0;
+  const deleteConversation = useCallback(
+    (id: string) => {
+      abortConversation(id);
+      remove(id);
+    },
+    [remove],
+  );
+
+  return (
+    <div className="shell">
+      <header className="topbar">
+        <div className="topbar-start">
+          <button
+            type="button"
+            className="icon-button menu-button"
+            onClick={() => setDrawerOpen(true)}
+            aria-label="Open chat history"
+            aria-expanded={drawerOpen}
+            aria-controls="history"
+          >
+            <PanelLeft size={18} aria-hidden="true" />
+          </button>
+          <a className="brand" href="/" aria-label="Liquid Insights home">
+            <img src="/brand/liquid-mark.png" alt="" width={28} height={28} />
+            <span className="brand-name">
+              Liquid <span>Insights</span>
+            </span>
+          </a>
+        </div>
+        <button type="button" className="new-chat" onClick={history.startNew} disabled={isFresh}>
+          <SquarePen size={16} aria-hidden="true" />
+          <span className="new-chat-label">New conversation</span>
+        </button>
+      </header>
+
+      <div className="layout">
+        <ConversationSidebar
+          conversations={history.conversations}
+          activeId={activeId}
+          onSelect={history.select}
+          onDelete={deleteConversation}
+          open={drawerOpen}
+          onClose={closeDrawer}
+        />
+        <ChatPane key={activeId} orgId={orgId} prompts={prompts} conversationId={activeId} store={history} />
+      </div>
     </div>
   );
 }
