@@ -76,10 +76,10 @@ function Workspace({ orgs, prompts }: { orgs: Organisation[]; prompts: Suggested
   return (
     <div className="shell" data-mode={inThread ? "thread" : "hero"}>
       <header className="topbar">
-        <a className="brand" href="/" aria-label="Grok Insights home">
+        <a className="brand" href="/" aria-label="Liquid Insights home">
           <img src="/brand/liquid-mark.png" alt="" width={28} height={28} />
           <span className="brand-name">
-            Grok <span>Insights</span>
+            Liquid <span>Insights</span>
           </span>
         </a>
         <OrgSwitcher orgs={orgs} selectedId={orgId} onSelect={changeOrg} />
@@ -88,7 +88,7 @@ function Workspace({ orgs, prompts }: { orgs: Organisation[]; prompts: Suggested
       <main className="main">
         {inThread ? (
           <>
-            <h1 className="visually-hidden">Grok Insights conversation</h1>
+            <h1 className="visually-hidden">Liquid Insights conversation</h1>
             <ChatThread entries={chat.entries} isSending={chat.isSending} onAsk={ask} onRetry={(q) => void chat.retry(q)} />
           </>
         ) : (
@@ -119,7 +119,7 @@ export default function App() {
         <main className="gate" aria-busy="true">
           <p className="kicker">
             <span className="kicker-dot" aria-hidden="true" />
-            Loading Grok Insights…
+            Loading Liquid Insights…
           </p>
         </main>
       );

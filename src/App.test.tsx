@@ -38,7 +38,7 @@ describe("App", () => {
 
     await userEvent.click(screen.getByRole("button", { name: /Open LIQ-24 status/ }));
 
-    expect(await screen.findByRole("article", { name: "Grok Insights answer" })).toBeInTheDocument();
+    expect(await screen.findByRole("article", { name: "Liquid Insights answer" })).toBeInTheDocument();
     expect(screen.getByText("What's the status of LIQ-24?")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /LIQ-24 AI Assistant parity/ })).toHaveAttribute("href", "https://linear.app/x/LIQ-24");
     expect(screen.getByText("Live data")).toBeInTheDocument();

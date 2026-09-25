@@ -54,23 +54,24 @@ a { color: inherit; }
 }
 .shell[data-mode="thread"] .topbar { border-bottom-color: var(--color-rule); }
 
-.brand { display: flex; align-items: center; gap: var(--space-3); text-decoration: none; min-width: 0; }
+.brand { display: flex; flex: 0 0 auto; align-items: center; gap: var(--space-3); text-decoration: none; }
 .brand img { width: 28px; height: 28px; display: block; }
 .brand-name { font-weight: 700; font-size: var(--text-lg); letter-spacing: -0.02em; color: var(--color-ink); white-space: nowrap; }
 .brand-name span { color: var(--color-accent); }
 
 /* ─── Org switcher ─────────────────────────────────────── */
-.org { position: relative; }
+.org { position: relative; min-width: 0; display: flex; justify-content: flex-end; }
 .org-button {
-  display: inline-flex; align-items: center; gap: var(--space-2);
+  display: inline-flex; align-items: center; gap: var(--space-2); max-width: 100%; min-width: 0;
   border: 1px solid var(--color-rule-strong); border-radius: var(--radius-pill);
   background: var(--color-surface); padding: 6px 12px 6px 6px; font-size: var(--text-sm);
   transition: border-color var(--duration-fast) ease, transform var(--duration-fast) ease;
 }
 .org-button:hover { border-color: var(--color-ink); }
 .org-button:active { transform: translateY(1px); }
+.org-name { min-width: 0; max-width: 16ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .org-avatar {
-  display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%;
+  display: grid; flex: 0 0 auto; place-items: center; width: 26px; height: 26px; border-radius: 50%;
   background: var(--color-accent-wash); color: var(--color-accent-strong); font-size: 11px; font-weight: 700;
 }
 .org-menu {
@@ -269,8 +270,7 @@ a { color: inherit; }
 /* ─── Responsive ───────────────────────────────────────── */
 @media (max-width: 640px) {
   .brand-name { font-size: var(--text-base); }
-  .org-name { display: none; }
-  .org-button { padding: 4px; }
+  .org-button { padding: 4px 10px 4px 4px; font-size: var(--text-xs); }
   .hero { padding-top: var(--space-7); }
   .pills-hero { flex-wrap: nowrap; justify-content: flex-start; overflow-x: auto; margin-left: -16px; margin-right: -16px; padding: 4px 16px; scrollbar-width: none; }
   .pills-hero > li { flex: 0 0 auto; }

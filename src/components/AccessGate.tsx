@@ -41,7 +41,7 @@ export function AccessGate({ onUnlocked }: AccessGateProps) {
         <span className="kicker-dot" aria-hidden="true" />
         Liquid demo · private
       </p>
-      <h1>Grok Insights</h1>
+      <h1>Liquid Insights</h1>
       <p>Enter the access code you were given to continue.</p>
       <form onSubmit={submit}>
         <label htmlFor="access-code" className="visually-hidden">

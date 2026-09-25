@@ -50,7 +50,7 @@ export function Composer({ value, onChange, onSubmit, disabled = false, autoFocu
         rows={1}
         value={value}
         autoFocus={autoFocus}
-        placeholder={placeholder ?? "Ask anything about tickets, bugs, PRs and delivery trends…"}
+        placeholder={placeholder ?? "Ask about tickets, bugs, PRs or CI…"}
         onChange={(event) => onChange(event.target.value)}
         onKeyDown={onKeyDown}
         aria-invalid={over || undefined}

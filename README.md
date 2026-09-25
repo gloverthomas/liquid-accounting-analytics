@@ -1,4 +1,4 @@
-# Grok Insights (liquid-accounting-analytics)
+# Liquid Insights (liquid-accounting-analytics)
 
 Ask plain-English questions about **Linear tickets, GitHub pull requests and CI checks** and get a short answer from Grok with **a cited source for every claim**. The app is read-only: it never changes Linear or GitHub.
 

@@ -30,9 +30,9 @@ function AssistantCard({ entryId, response, onAsk, disabled }: { entryId: string
   const followUps = response.relatedQuestions.map((q, i) => ({ id: `${entryId}-f${i}`, label: q, query: q }));
 
   return (
-    <article className="answer" aria-label="Grok Insights answer">
+    <article className="answer" aria-label="Liquid Insights answer">
       <header className="answer-head">
-        <span>Grok Insights</span>
+        <span>Liquid Insights</span>
         {sourceBadge(response)}
       </header>
       <AnswerMarkdown text={response.reply} citationIndex={citationIndex} anchorPrefix={anchorPrefix} />

@@ -11,7 +11,7 @@ test("LIQ-24 pill → cited answer", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: /Open LIQ-24 status/ }).click();
 
-  const answer = page.getByRole("article", { name: "Grok Insights answer" });
+  const answer = page.getByRole("article", { name: "Liquid Insights answer" });
   await expect(answer).toBeVisible();
   await expect(answer.getByText("Sample data", { exact: true })).toBeVisible();
   const sources = answer.getByRole("region", { name: "Sources" });
@@ -24,11 +24,11 @@ test("typed follow-up keeps the thread and has no horizontal overflow", async ({
   await page.goto("/");
   await page.getByRole("textbox").fill("Is assistant-unit passing on Core and Reporting main?");
   await page.keyboard.press("Enter");
-  await expect(page.getByRole("article", { name: "Grok Insights answer" })).toContainText("green");
+  await expect(page.getByRole("article", { name: "Liquid Insights answer" })).toContainText("green");
 
   await page.getByPlaceholder("Ask a follow-up…").fill("What merged recently?");
   await page.keyboard.press("Enter");
-  await expect(page.getByRole("article", { name: "Grok Insights answer" })).toHaveCount(2);
+  await expect(page.getByRole("article", { name: "Liquid Insights answer" })).toHaveCount(2);
 
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(0);
