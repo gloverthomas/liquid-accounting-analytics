@@ -52,7 +52,7 @@ function connectorFlags(config: Config) {
     grok: Boolean(config.xai.apiKey),
     linear: Boolean(config.linear.apiKey),
     github: Boolean(config.github.token),
-    posthog: false,
+    posthog: Boolean(config.posthog.apiKey && config.posthog.projectId),
     sentry: false,
     fixtures: config.allowFixtures,
     actions: Boolean(config.actions.linearApiKey),
