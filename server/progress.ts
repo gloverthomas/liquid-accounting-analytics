@@ -17,6 +17,7 @@ const CHART_NAMES: Record<ChartKind, string> = {
   assistant_usage: "AI Assistant messages",
   insights_topics: "questions by topic",
   insights_daily: "questions per day",
+  sentry_errors: "Sentry events per day",
 };
 
 function list(items: string[]): string {
@@ -52,6 +53,7 @@ export function progressSteps(message: string, config: Config): string[] {
   if (plan.charts.includes("ci_history")) github.push(`${plan.checkName ?? "CI"} run history`);
   steps.push(`Checking GitHub ${list(github)}${sample(Boolean(config.github.token))}…`);
 
+  if (plan.wantsSentry && config.sentry.token) steps.push(`Checking Sentry for ${config.sentry.environment} errors in Core and Reporting…`);
   if (plan.wantsPosthog) steps.push(`Pulling product analytics from PostHog${sample(Boolean(config.posthog.apiKey && config.posthog.projectId))}…`);
 
   steps.push("Ranking the most relevant sources…");

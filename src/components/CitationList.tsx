@@ -1,4 +1,4 @@
-import { CircleCheck, CircleDot, GitPullRequest, LineChart, Ticket } from "lucide-react";
+import { Bug, CircleCheck, CircleDot, GitPullRequest, LineChart, Ticket } from "lucide-react";
 import type { Citation } from "../../shared/contracts";
 import { statusTone } from "../lib/status";
 
@@ -12,6 +12,7 @@ const KIND_ICON = {
   github_pr: GitPullRequest,
   github_check: CircleCheck,
   posthog_insight: LineChart,
+  sentry_issue: Bug,
 } as const;
 
 const KIND_LABEL = {
@@ -19,6 +20,7 @@ const KIND_LABEL = {
   github_pr: "GitHub PR",
   github_check: "CI check",
   posthog_insight: "PostHog",
+  sentry_issue: "Sentry",
 } as const;
 
 /** Only http(s) links are rendered as links; anything else is shown as plain text. */

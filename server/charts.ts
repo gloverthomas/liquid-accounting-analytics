@@ -6,6 +6,7 @@ import type { ChartSeries, ChartSpec } from "../shared/contracts.js";
 import type { RetrievalPlan } from "./retrieval/router.js";
 import type { LinearActivityNode } from "./retrieval/linear.js";
 import type { PosthogRow } from "./retrieval/posthog.js";
+import type { SentryDay } from "./retrieval/sentry.js";
 import type { RetrievedItem } from "./retrieval/types.js";
 
 const DAY_MS = 86_400_000;
@@ -27,6 +28,8 @@ export interface ChartInputs {
   activity?: LinearActivityNode[];
   runs?: CiRunPoint[];
   posthog?: PosthogRow[];
+  sentryDaily?: SentryDay[];
+  sentryEnvironment?: string;
   /** Per-dataset sample flags (sample connectors produce sample charts). */
   sample: { linear: boolean; github: boolean };
 }
@@ -254,6 +257,33 @@ export function assistantUsage(rows: PosthogRow[], days: number, nowMs: number, 
   };
 }
 
+export function sentryErrors(daily: SentryDay[], days: number, nowMs: number, timeZone: string, environment: string): ChartSpec | null {
+  const b = makeBuckets(days, nowMs, timeZone);
+  const count = (app: string) => {
+    const values = b.labels.map(() => 0);
+    for (const d of daily.filter((x) => x.app === app)) {
+      const i = b.indexOf(d.day);
+      if (i >= 0) values[i] += d.n;
+    }
+    return values;
+  };
+  const series: ChartSeries[] = [
+    { key: "core", name: "Core", color: "series1", values: count("core") },
+    { key: "reporting", name: "Reporting", color: "series2", values: count("reporting") },
+  ];
+  if (!series.some((s) => s.values.some(Boolean))) return null;
+  return {
+    id: "sentry_errors",
+    kind: "grouped",
+    title: `Sentry events per ${b.unit}`,
+    subtitle: `${windowNote(days, b.unit, timeZone)} · ${environment} only · Sentry`,
+    categories: b.labels,
+    series,
+    unit: "events",
+    sample: false,
+  };
+}
+
 export function buildCharts(plan: RetrievalPlan, inputs: ChartInputs, nowMs: number, timeZone: string, bugsOnly: boolean): ChartSpec[] {
   const charts: Array<ChartSpec | null> = plan.charts.map((kind) => {
     switch (kind) {
@@ -274,6 +304,8 @@ export function buildCharts(plan: RetrievalPlan, inputs: ChartInputs, nowMs: num
       case "insights_topics":
       case "insights_daily":
         return null; // built by the question-log path (retrieval/insightsUsage.ts)
+      case "sentry_errors":
+        return inputs.sentryDaily ? sentryErrors(inputs.sentryDaily, plan.sinceDays, nowMs, timeZone, inputs.sentryEnvironment ?? "production") : null;
     }
   });
   return charts.filter((c): c is ChartSpec => c !== null);

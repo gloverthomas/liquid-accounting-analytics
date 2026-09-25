@@ -30,6 +30,7 @@ function problemSignal(item: RetrievedItem, plan: RetrievalPlan, nowMs: number):
   if (item.labels?.some((l) => /bug|incident|regression/i.test(l))) signal += 25;
   if (item.citation.kind === "github_check" && FAILED_CHECK.has(item.citation.status ?? "")) signal += 50;
   if (item.citation.kind === "github_pr" && FIX_TITLE.test(item.citation.title)) signal += 15;
+  if (item.citation.kind === "sentry_issue") signal += item.citation.status === "error" ? 45 : 30;
   const inWindow = item.updatedAt ? nowMs - Date.parse(item.updatedAt) <= plan.sinceDays * 86_400_000 : false;
   return inWindow ? signal : signal - 25;
 }

@@ -5,7 +5,7 @@
 
 export type ConnectorId = "linear" | "github" | "posthog" | "sentry" | "github_search";
 
-export type CitationKind = "linear_issue" | "github_pr" | "github_check" | "posthog_insight";
+export type CitationKind = "linear_issue" | "github_pr" | "github_check" | "posthog_insight" | "sentry_issue";
 
 export interface Citation {
   /** Stable retrieval id, e.g. `linear:LIQ-24` or `github:PR:owner/repo#10`. */

@@ -34,6 +34,7 @@ With no keys it runs in **sample mode**: realistic LIQ-24 demo data and canned a
 | `LIQUID_BFF_DEMO_TOKEN` | Local dev auth | Injected by the Vite proxy; never in the bundle |
 | `LIQUID_INSIGHTS_ACCESS_CODE` / `LIQUID_SESSION_SECRET` | **Hosted auth** | Required on Vercel, or every API route returns 503 |
 | `POSTHOG_PERSONAL_API_KEY` / `POSTHOG_PROJECT_ID` / `POSTHOG_HOST` | Live product analytics | Read-only key; host must be us/eu/app.posthog.com |
+| `SENTRY_AUTH_TOKEN` / `SENTRY_ORG` / `SENTRY_HOST` | Production errors | Read-only User Auth Token; production issues only, no stack traces |
 | `POSTHOG_PROJECT_TOKEN` | Insights question log | Public `phc_` token; categories only, never question text |
 | `LINEAR_ACTIONS_API_KEY` | Ticket moves | A **separate** Linear key with write access; without it the app stays read-only |
 
@@ -68,6 +69,7 @@ Some questions come back with a chart above the sources:
 | "How often has assistant-unit failed over the last 2 weeks?" | Passed vs failed per day, for that check or for all CI runs |
 | "How has product usage changed over the last 2 weeks?" | Product activity per day, Core vs Reporting (PostHog) |
 | "Is the BFF disconnecting? Show connection checks per day" | BFF connected vs not per day (PostHog) |
+| "Is Reporting erroring more than Core? Show errors per day" | Sentry production events per day, Core vs Reporting |
 
 - **The server computes every chart number** from Linear and GitHub data (`server/charts.ts`); Grok only writes the prose around it and is given the same numbers.
 - **Days follow `LIQUID_TIMEZONE`** (default Australia/Sydney). Windows up to 14 days are shown per day; longer ones per week.

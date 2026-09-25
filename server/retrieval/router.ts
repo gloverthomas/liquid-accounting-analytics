@@ -6,7 +6,7 @@
 export type Intent = "insights_usage" | "issue_status" | "ci_health" | "trend" | "problems" | "merged_prs" | "linear_overview" | "general";
 
 /** Server-computed charts a question can ask for. */
-export type ChartKind = "prs_per_day" | "tickets_by_state" | "opened_vs_closed" | "ci_history" | "usage_trend" | "bff_health" | "assistant_usage" | "insights_topics" | "insights_daily";
+export type ChartKind = "prs_per_day" | "tickets_by_state" | "opened_vs_closed" | "ci_history" | "usage_trend" | "bff_health" | "assistant_usage" | "insights_topics" | "insights_daily" | "sentry_errors";
 
 /** "overview" = narrative summary + key items; "direct" = short answer to a specific question. */
 export type AnswerStyle = "overview" | "direct";
@@ -19,6 +19,8 @@ export interface RetrievalPlan {
   sinceDays: number;
   wantsChecks: boolean;
   wantsPosthog: boolean;
+  /** Production errors from Sentry: asked for directly, or part of a "what went wrong" question. */
+  wantsSentry: boolean;
   keywords: string[];
   style: AnswerStyle;
   charts: ChartKind[];
@@ -50,6 +52,8 @@ const META_USAGE = [
 ];
 export const isInsightsUsageQuestion = (message: string) => META_USAGE.some((re) => re.test(message));
 
+const SENTRY_WORDS = /\b(sentry|errors?|exceptions?|crash(es|ed|ing)?|erroring|breaking for users|user-facing|js errors?)\b/i;
+
 const CHART_WORDS = /\b(charts?|graphs?|plot|visuali[sz]e|per day|per week|daily|weekly|over time|trends?|breakdown|by (status|state)|history|how often|each day|each week)\b/i;
 const TICKET_NOUNS = /\b(tickets?|bugs?|issues?|defects?)\b/i;
 const OPEN_CLOSE = /\b(open(ed|ing)?|creat(ed|ing)|new|clos(e|ed|ing)|resolv(e|ed|ing)|fix(ed|ing)?)\b/i;
@@ -76,6 +80,7 @@ function pickCharts(message: string, intent: Intent, linearStates: string[]): Ch
   const usageAsk = PRODUCT_WORDS.test(message) && (wantsChart || GOING.test(message) || intent === "trend");
   // "AI Assistant usage" gets the assistant chart; other usage questions get general product activity.
   if (usageAsk) charts.push(/\b(ai )?assistant\b/i.test(message) ? "assistant_usage" : "usage_trend");
+  if (SENTRY_WORDS.test(message) && (wantsChart || GOING.test(message) || /\b(more than|vs\.?|versus|compare|each app)\b/i.test(message))) charts.push("sentry_errors");
   if (BFF_WORDS.test(message) && (wantsChart || GOING.test(message) || /\bhow often|errors?|failing\b/i.test(message))) charts.push("bff_health");
   return charts;
 }
@@ -150,6 +155,7 @@ export function planRetrieval(message: string, configuredRepos: string[]): Retri
     repos: pickRepos(lower, configuredRepos),
     sinceDays: windowDays(lower),
     wantsChecks: intent === "ci_health" || intent === "problems" || intent === "general" || CI_WORDS.test(message),
+    wantsSentry: intent === "problems" || SENTRY_WORDS.test(message),
     wantsPosthog: intent === "insights_usage" || intent === "trend" || PRODUCT_WORDS.test(message) || BFF_WORDS.test(message),
     keywords: extractKeywords(lower),
     style: ["problems", "trend", "general", "insights_usage"].includes(intent) || OVERVIEW_WORDS.test(message) ? "overview" : "direct",

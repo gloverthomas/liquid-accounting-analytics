@@ -25,6 +25,7 @@ import {
   type GithubWorkflowRun,
 } from "./github.js";
 import { fetchLinearActivity, fetchLinearIssues, fetchLinearRecent, normalizeLinearIssue, type LinearActivityNode, type LinearDeps, type LinearIssueNode } from "./linear.js";
+import { fetchSentryDaily, fetchSentryIssues, normalizeSentryIssue, sentryCounts, type SentryDay, type SentryIssue } from "./sentry.js";
 import { fetchQuestionLog, normalizeQuestionLog, questionTopicsChart, questionsPerDayChart, type QuestionLog } from "./insightsUsage.js";
 import { fetchPosthogActivity, normalizePosthogActivity, samplePosthogInsight, type PosthogRow } from "./posthog.js";
 import { buildCharts, describeChart, type ChartInputs, type CiRunPoint } from "../charts.js";
@@ -288,6 +289,33 @@ export async function runRetrieval(plan: RetrievalPlan, config: Config, deps: Re
     runConnector("linear", linearLive, allowFixtures ? () => collectLinear(sampleLinear, plan) : null, now),
     runConnector("github", githubLive, allowFixtures ? () => collectGithub(sampleGithub, plan, github.branch, now()) : null, now),
   ];
+  // Sentry: production issues per app (+ daily counts when charted). Only when configured —
+  // there's no sample Sentry data, and an unconfigured source shouldn't pad answers.
+  let sentryIssues: SentryIssue[] | undefined;
+  let sentryDaily: SentryDay[] | undefined;
+  const sn = config.sentry;
+  if (plan.wantsSentry && sn.token) {
+    const snDeps = { token: sn.token, org: sn.org, host: sn.host, environment: sn.environment, fetch: depsFetch };
+    tasks.push(
+      runConnector(
+        "sentry",
+        async () => {
+          const [issues, daily] = await Promise.all([
+            cache.getOrLoad(`sentry:issues:${sn.org}:${sn.environment}:${plan.sinceDays}`, CACHE_TTL_MS.githubPrs, () => fetchSentryIssues(plan.sinceDays, snDeps)),
+            plan.charts.includes("sentry_errors")
+              ? cache.getOrLoad(`sentry:daily:${sn.org}:${sn.environment}:${plan.sinceDays}`, CACHE_TTL_MS.githubPrs, () => fetchSentryDaily(plan.sinceDays, snDeps))
+              : Promise.resolve(undefined),
+          ]);
+          sentryIssues = issues;
+          sentryDaily = daily;
+          return issues.map((i) => normalizeSentryIssue(i, sn.environment));
+        },
+        null,
+        now,
+      ),
+    );
+  }
+
   // PostHog rows feed both the summary item and the usage/BFF charts.
   let posthogRows: PosthogRow[] | undefined;
   if (plan.wantsPosthog) {
@@ -323,10 +351,18 @@ export async function runRetrieval(plan: RetrievalPlan, config: Config, deps: Re
       now(),
     );
     const bugsOnly = plan.keywords.some((k) => /^bugs?$/.test(k));
-    charts = buildCharts(plan, { items: allItems, ...extra, posthog: posthogRows, sample: { linear: modes.linear === "sample", github: modes.github === "sample" } }, now(), config.timeZone, bugsOnly);
+    charts = buildCharts(plan, { items: allItems, ...extra, posthog: posthogRows, sentryDaily, sentryEnvironment: sn.environment, sample: { linear: modes.linear === "sample", github: modes.github === "sample" } }, now(), config.timeZone, bugsOnly);
   }
   const chartText = charts.map(describeChart).join("\n");
-  const counts = [chartText, linearCounts(allItems, plan.sinceDays, now()), githubCounts(allItems, plan.sinceDays, now())].filter(Boolean).join("\n\n") || null;
+  const counts =
+    [
+      chartText,
+      linearCounts(allItems, plan.sinceDays, now()),
+      githubCounts(allItems, plan.sinceDays, now()),
+      sentryIssues ? sentryCounts(sentryIssues, sentryDaily, plan.sinceDays, sn.environment) : null,
+    ]
+      .filter(Boolean)
+      .join("\n\n") || null;
   const packed = packContext(ranked, CONTEXT_CHAR_BUDGET - (counts ? counts.length + 2 : 0));
 
   return {

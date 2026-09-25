@@ -15,6 +15,7 @@ const E2E_ENV = {
   POSTHOG_PROJECT_TOKEN: "",
   POSTHOG_PERSONAL_API_KEY: "",
   LINEAR_ACTIONS_API_KEY: "",
+  SENTRY_AUTH_TOKEN: "",
 };
 
 export default defineConfig({

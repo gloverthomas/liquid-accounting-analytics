@@ -64,7 +64,7 @@ function connectorFlags(config: Config) {
     github: Boolean(config.github.token),
     posthog: Boolean(config.posthog.apiKey && config.posthog.projectId),
     questionLog: Boolean(config.posthog.projectToken),
-    sentry: false,
+    sentry: Boolean(config.sentry.token),
     fixtures: config.allowFixtures,
     actions: Boolean(config.actions.linearApiKey),
   };

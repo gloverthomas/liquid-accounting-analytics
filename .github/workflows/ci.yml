@@ -15,6 +15,7 @@ env:
   GITHUB_TOKEN: ""
   POSTHOG_PROJECT_TOKEN: ""
   POSTHOG_PERSONAL_API_KEY: ""
+  SENTRY_AUTH_TOKEN: ""
 
 jobs:
   build:

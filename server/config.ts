@@ -22,6 +22,7 @@ export interface Config {
   timeZone: string;
   /** apiKey = personal key (read queries); projectToken = public phc_ token (writes the question log). */
   posthog: { apiKey: string | null; projectId: string | null; host: string; projectToken: string | null };
+  sentry: { token: string | null; org: string; host: string; environment: string };
 }
 
 type Env = Record<string, string | undefined>;
@@ -70,6 +71,14 @@ function parsePosthogHost(raw: string | null): string {
   return POSTHOG_HOSTS.has(host) ? host : "https://us.posthog.com";
 }
 
+/** Sentry's own API hosts only: the token is sent there (SSRF guard). */
+const SENTRY_HOSTS = new Set(["https://sentry.io", "https://us.sentry.io", "https://de.sentry.io"]);
+
+function parseSentryHost(raw: string | null): string {
+  const host = (raw ?? "https://us.sentry.io").replace(/\/+$/, "");
+  return SENTRY_HOSTS.has(host) ? host : "https://us.sentry.io";
+}
+
 function parseTimeout(raw: string | null): number {
   const value = Number.parseInt(raw ?? "", 10);
   return Number.isFinite(value) && value >= 1_000 && value <= 60_000 ? value : DEFAULT_XAI_TIMEOUT_MS;
@@ -116,6 +125,12 @@ export function loadConfig(env: Env = process.env): Config {
       branch: str(env, "GITHUB_BRANCH") ?? "main",
     },
     timeZone: parseTimeZone(str(env, "LIQUID_TIMEZONE")),
+    sentry: {
+      token: str(env, "SENTRY_AUTH_TOKEN"),
+      org: /^[a-z0-9-]{1,64}$/.test(str(env, "SENTRY_ORG") ?? "") ? str(env, "SENTRY_ORG")! : "liquid-accounting",
+      host: parseSentryHost(str(env, "SENTRY_HOST")),
+      environment: /^[a-z0-9_-]{1,32}$/i.test(str(env, "SENTRY_ENVIRONMENT") ?? "") ? str(env, "SENTRY_ENVIRONMENT")! : "production",
+    },
     posthog: {
       apiKey: str(env, "POSTHOG_PERSONAL_API_KEY"),
       projectId: /^\d{1,12}$/.test(str(env, "POSTHOG_PROJECT_ID") ?? "") ? str(env, "POSTHOG_PROJECT_ID") : null,

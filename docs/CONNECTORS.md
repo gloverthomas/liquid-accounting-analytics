@@ -27,7 +27,21 @@ All connectors are **read-only** and run on the server only. The browser never t
 - **Output:** an aggregate summary item that leads with what **isn't** tracked (AI Assistant usage), plus the "Product activity" and "BFF connection checks" charts.
 - **Without keys:** falls back to the sample insight.
 
-## Sentry, code search
+## Sentry (`server/retrieval/sentry.ts`)
+
+- **Auth:** `SENTRY_AUTH_TOKEN`, a User Auth Token (`sntryu_…`) with read-only `org:read`, `project:read` and `event:read`. `SENTRY_HOST` must be `sentry.io`, `us.sentry.io` or `de.sentry.io`. `SENTRY_ORG` defaults to `liquid-accounting`.
+- **Scope:** only the `SENTRY_ENVIRONMENT` environment (default `production`), so local-dev noise such as react-refresh errors is excluded. Core and Reporting are split by the apps' own `app` tag.
+- **Calls:**
+  - The issue list (`is:unresolved environment:… app:…`) per app.
+  - When a chart is asked for, `events-stats` daily counts per app.
+  - Summaries only: title, level, counts, dates, culprit and link. It never fetches event payloads, stack traces or user details.
+- **Output:**
+  - One cited item per issue.
+  - A server-computed SENTRY COUNTS block.
+  - The "Sentry events per day, Core vs Reporting" chart.
+- **Without a token:** skipped entirely (there's no sample Sentry data).
+
+## Code search
 
 - Not in the MVP (spec v2).
 
