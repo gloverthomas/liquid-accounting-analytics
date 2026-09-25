@@ -90,6 +90,25 @@ describe("App", () => {
     expect(again.container.querySelector(".shell")).toHaveAttribute("data-sidebar", "expanded");
   });
 
+  it("shows the server's real progress steps while waiting, then the answer", async () => {
+    let release!: () => void;
+    route({
+      "/api/v1/orgs": () => jsonRes(ORGS),
+      "/api/v1/suggested-prompts": () => jsonRes(PROMPTS),
+      "/api/v1/insights/progress": () => jsonRes({ requestId: "r", steps: ["Pulling product analytics from PostHog…", "Asking Grok to write it up…"] }),
+    });
+    const base = fetchMock.getMockImplementation()!;
+    fetchMock.mockImplementation(async (input, init) =>
+      String(input) === "/api/v1/insights/chat" ? new Promise<Response>((r) => (release = () => r(jsonRes(chatResponse())))) : base(input, init),
+    );
+    render(<App />);
+    await userEvent.type(await screen.findByRole("textbox"), "Is AI Assistant usage going up?{Enter}");
+    expect(await screen.findByText("Pulling product analytics from PostHog…")).toBeInTheDocument();
+    release();
+    expect(await screen.findByRole("article", { name: "Liquid Insights answer" })).toBeInTheDocument();
+    expect(screen.queryByText("Pulling product analytics from PostHog…")).toBeNull();
+  });
+
   it("offers to re-ask a question that was saved without an answer", async () => {
     localStorage.setItem(
       "liquid-insights:conversations:v1",

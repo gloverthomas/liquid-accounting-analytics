@@ -9,6 +9,7 @@ import { sessionAuthEnabled, type Config } from "./config.js";
 import { createXaiClient, type GrokClient } from "./grok/client.js";
 import { BodyError, errorResponse, json, noContent, readJsonBody, type RequestContext } from "./http.js";
 import { answerQuestion } from "./insights.js";
+import { progressSteps } from "./progress.js";
 import { errorCode, logEvent } from "./log.js";
 import { ORGS, DEFAULT_ORG, SUGGESTED_PROMPTS } from "./org.js";
 import { RATE_LIMITS, RateLimiter } from "./rateLimit.js";
@@ -147,6 +148,12 @@ export function createApp(deps: AppDeps): AppHandler {
     }
 
     if (method === "POST" && path === "/api/v1/insights/chat") return handleChat(request, ctx);
+    if (method === "POST" && path === "/api/v1/insights/progress") {
+      const body = await readJsonBody(request);
+      const message = typeof body.message === "string" ? body.message.trim() : "";
+      if (message.length < MESSAGE_MIN_CHARS || message.length > MESSAGE_MAX_CHARS) return errorResponse(400, ctx.requestId, "invalid_message");
+      return json(200, ctx.requestId, { steps: progressSteps(message, config) });
+    }
     if (method === "POST" && path === "/api/v1/actions/linear-transition") return handleTransition(request, ctx);
     if (method !== "GET") return errorResponse(405, ctx.requestId, "method_not_allowed");
 

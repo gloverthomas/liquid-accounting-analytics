@@ -12,6 +12,8 @@ import { SourcesAccordion } from "./SourcesAccordion";
 interface ChatThreadProps {
   entries: ThreadEntry[];
   isSending: boolean;
+  /** Real progress steps for the in-flight question, when known. */
+  progress?: string[];
   /** Set when the last question never got an answer (e.g. the page was reloaded mid-request). */
   interruptedQuestion?: string;
   onAsk: (query: string) => void;
@@ -20,8 +22,9 @@ interface ChatThreadProps {
   onDismissAction: (entryId: string) => void;
 }
 
-const PENDING_STAGES = ["Searching Linear and GitHub…", "Ranking the most relevant sources…", "Asking Grok to summarise…"];
-const STAGE_INTERVAL_MS = 1_800;
+/** Used only until the server's real steps arrive (or if that call fails). */
+const FALLBACK_STAGES = ["Gathering sources…", "Ranking the most relevant sources…", "Writing the answer…"];
+const STAGE_INTERVAL_MS = 1_200;
 
 function sourceBadge(response: ChatResponse) {
   const modes = Object.values(response.retrievalMeta.connectorModes);
@@ -75,17 +78,20 @@ function AssistantCard({ entryId, response, onAsk, disabled, isLatest, onConfirm
   );
 }
 
-function PendingCard() {
+function PendingCard({ steps }: { steps?: string[] }) {
+  const stages = steps?.length ? steps : FALLBACK_STAGES;
   const [stage, setStage] = useState(0);
   useEffect(() => {
-    const timer = setInterval(() => setStage((s) => Math.min(s + 1, PENDING_STAGES.length - 1)), STAGE_INTERVAL_MS);
+    const timer = setInterval(() => setStage((s) => s + 1), STAGE_INTERVAL_MS);
     return () => clearInterval(timer);
   }, []);
+  // Hold on the last step (usually the write-up) until the answer lands.
+  const current = stages[Math.min(stage, stages.length - 1)];
   return (
     <div className="answer pending" aria-busy="true">
       <p className="pending-status" role="status">
         <LoaderCircle size={14} aria-hidden="true" />
-        {PENDING_STAGES[stage]}
+        {current}
       </p>
       <div className="skeleton" />
       <div className="skeleton" />
@@ -95,7 +101,7 @@ function PendingCard() {
   );
 }
 
-export function ChatThread({ entries, isSending, interruptedQuestion, onAsk, onRetry, onConfirmAction, onDismissAction }: ChatThreadProps) {
+export function ChatThread({ entries, isSending, progress, interruptedQuestion, onAsk, onRetry, onConfirmAction, onDismissAction }: ChatThreadProps) {
   const threadRef = useRef<HTMLElement>(null);
 
   // Keep the latest question pinned at the top so its answer reads beneath it.
@@ -151,7 +157,7 @@ export function ChatThread({ entries, isSending, interruptedQuestion, onAsk, onR
           </div>
         </div>
       ) : null}
-      {isSending ? <PendingCard /> : null}
+      {isSending ? <PendingCard steps={progress} /> : null}
     </section>
   );
 }

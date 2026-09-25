@@ -1,0 +1,57 @@
+/**
+ * Human-readable progress steps for a question, derived from the same rules
+ * the real request uses (no network). The UI shows them while it waits, so
+ * the loading state says what's actually happening.
+ */
+import { detectTicketAction } from "./actions/linearTransition.js";
+import type { Config } from "./config.js";
+import { planRetrieval, type ChartKind } from "./retrieval/router.js";
+
+const CHART_NAMES: Record<ChartKind, string> = {
+  prs_per_day: "PRs merged per day",
+  tickets_by_state: "tickets by status",
+  opened_vs_closed: "opened vs closed",
+  ci_history: "CI results over time",
+  usage_trend: "product activity",
+  bff_health: "BFF connection health",
+  assistant_usage: "AI Assistant messages",
+};
+
+function list(items: string[]): string {
+  if (items.length <= 1) return items.join("");
+  return `${items.slice(0, -1).join(", ")} and ${items.at(-1)}`;
+}
+
+export function progressSteps(message: string, config: Config): string[] {
+  const action = detectTicketAction(message);
+  if (action) {
+    return action.issueIds.length === 1
+      ? [`Looking up ${action.issueIds[0]} in Linear…`, "Checking its current status…", "Preparing a confirmation…"]
+      : ["Checking which tickets can be moved…", "Finding suggestions in Linear…"];
+  }
+
+  const plan = planRetrieval(message, config.github.repos);
+  const sample = (configured: boolean) => (configured || !config.allowFixtures ? "" : " (sample data)");
+  const steps: string[] = [];
+
+  const linear = plan.issueIds.length ? `Reading ${list(plan.issueIds)} in Linear` : "Reading recent Linear tickets";
+  steps.push(`${linear}${plan.charts.includes("opened_vs_closed") ? " and when they were opened and closed" : ""}${sample(Boolean(config.linear.apiKey))}…`);
+
+  const github = ["merged PRs"];
+  if (plan.issueIds.length) github.push(`PRs mentioning ${list(plan.issueIds)}`);
+  if (plan.wantsChecks) github.push("CI checks");
+  if (plan.charts.includes("ci_history")) github.push(`${plan.checkName ?? "CI"} run history`);
+  steps.push(`Checking GitHub ${list(github)}${sample(Boolean(config.github.token))}…`);
+
+  if (plan.wantsPosthog) steps.push(`Pulling product analytics from PostHog${sample(Boolean(config.posthog.apiKey && config.posthog.projectId))}…`);
+
+  steps.push("Ranking the most relevant sources…");
+
+  if (plan.charts.length) {
+    const names = plan.charts.map((c) => CHART_NAMES[c]);
+    steps.push(`Building ${plan.charts.length === 1 ? "a chart" : `${plan.charts.length} charts`}: ${list(names)}…`);
+  }
+
+  steps.push(config.xai.apiKey ? "Asking Grok to write it up…" : "Putting the answer together…");
+  return steps;
+}

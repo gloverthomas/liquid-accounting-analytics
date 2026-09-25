@@ -10,11 +10,13 @@ import type { ConversationsApi, ThreadEntry } from "./useConversations";
 
 export type { ThreadEntry } from "./useConversations";
 
-type Store = Pick<ConversationsApi, "entriesOf" | "update" | "isPending" | "setPending">;
+type Store = Pick<ConversationsApi, "entriesOf" | "update" | "isPending" | "setPending" | "stepsOf" | "setSteps">;
 
 export interface InsightsChat {
   entries: ThreadEntry[];
   isSending: boolean;
+  /** What the server is doing for the in-flight question, when known. */
+  progress: string[] | undefined;
   send: (message: string) => Promise<void>;
   retry: (message: string) => Promise<void>;
   /** Runs a proposed ticket move. Resolves to an error message to show inline, or null on success. */
@@ -60,6 +62,14 @@ export function useInsightsChat(orgId: string | undefined, conversationId: strin
       const controller = new AbortController();
       inFlight.set(id, controller);
       storeRef.current.setPending(id, true);
+      // Cheap, rule-based preview of the real work; the loading card falls back to generic steps without it.
+      storeRef.current.setSteps(id, undefined);
+      api
+        .progress(message)
+        .then((steps) => {
+          if (storeRef.current.isPending(id)) storeRef.current.setSteps(id, steps);
+        })
+        .catch(() => undefined);
       try {
         const response = await api.chat({ message, history, orgId }, controller.signal);
         storeRef.current.update(id, (prev) => [...prev, { id: nextId("a"), role: "assistant", response }]);
@@ -69,6 +79,7 @@ export function useInsightsChat(orgId: string | undefined, conversationId: strin
       } finally {
         if (inFlight.get(id) === controller) inFlight.delete(id);
         storeRef.current.setPending(id, false);
+        storeRef.current.setSteps(id, undefined);
       }
     },
     [orgId],
@@ -141,5 +152,13 @@ export function useInsightsChat(orgId: string | undefined, conversationId: strin
     [clearProposal, conversationId],
   );
 
-  return { entries: store.entriesOf(conversationId), isSending: store.isPending(conversationId), send, retry, confirmAction, dismissAction };
+  return {
+    entries: store.entriesOf(conversationId),
+    isSending: store.isPending(conversationId),
+    progress: store.stepsOf(conversationId),
+    send,
+    retry,
+    confirmAction,
+    dismissAction,
+  };
 }

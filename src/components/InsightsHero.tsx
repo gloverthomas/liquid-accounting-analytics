@@ -16,7 +16,7 @@ export function InsightsHero({ draft, onDraftChange, onAsk, prompts, disabled }:
       <h1 id="hero-heading" className="hero-title reveal reveal-2">
         What do you want <em>to know?</em>
       </h1>
-      <p className="hero-sub reveal reveal-2">Plain-English answers about tickets, pull requests and checks, with a source for every claim.</p>
+      <p className="hero-sub reveal reveal-2">Plain-English answers about tickets, pull requests, CI and product analytics, with a source for every claim.</p>
       <div className="reveal reveal-3">
         <Composer value={draft} onChange={onDraftChange} onSubmit={onAsk} disabled={disabled} autoFocus />
       </div>

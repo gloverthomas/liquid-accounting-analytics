@@ -88,6 +88,7 @@ function ChatPane({ orgId, prompts, conversationId, store }: ChatPaneProps) {
             <ChatThread
               entries={chat.entries}
               isSending={chat.isSending}
+              progress={chat.progress}
               interruptedQuestion={interrupted}
               onAsk={ask}
               onRetry={(q) => void chat.retry(q)}

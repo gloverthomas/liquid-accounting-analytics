@@ -9,7 +9,10 @@ const fetchMock = vi.fn<typeof fetch>();
 
 beforeEach(() => {
   fetchMock.mockReset();
-  vi.stubGlobal("fetch", fetchMock);
+  // Progress steps are a side request; answer it here so fetchMock only sees chat calls.
+  vi.stubGlobal("fetch", (input: RequestInfo | URL, init?: RequestInit) =>
+    String(input).includes("/insights/progress") ? Promise.resolve(jsonRes({ requestId: "r", steps: ["Reading LIQ-24 in Linear…"] })) : fetchMock(input, init),
+  );
   localStorage.clear();
 });
 afterEach(() => vi.unstubAllGlobals());

@@ -38,6 +38,7 @@ export const api = {
   orgs: () => request<{ orgs: Organisation[] }>("/api/v1/orgs").then((r) => r.orgs),
   suggestedPrompts: () => request<{ prompts: SuggestedPrompt[] }>("/api/v1/suggested-prompts").then((r) => r.prompts),
   chat: (body: ChatRequest, signal?: AbortSignal) => request<ChatResponse>("/api/v1/insights/chat", { method: "POST", body: JSON.stringify(body), signal }),
+  progress: (message: string) => request<{ steps: string[] }>("/api/v1/insights/progress", { method: "POST", body: JSON.stringify({ message }) }).then((r) => r.steps),
   confirmTransition: (token: string) => request<ChatResponse>("/api/v1/actions/linear-transition", { method: "POST", body: JSON.stringify({ token }) }),
   createSession: (accessCode: string) => request<void>("/api/v1/session", { method: "POST", body: JSON.stringify({ accessCode }) }),
   endSession: () => request<void>("/api/v1/session", { method: "DELETE" }),
