@@ -1,0 +1,159 @@
+/**
+ * Framework-free BFF: `(Request, ctx) → Response`. The local Node server and the
+ * Vercel function are thin adapters around this, so both enforce identical rules.
+ */
+import { HISTORY_MAX_TURNS, MESSAGE_MAX_CHARS, MESSAGE_MIN_CHARS, type ChatResponse, type ChatTurn } from "../shared/contracts.js";
+import { accessCodeMatches, authenticate, buildSessionCookie, createSessionToken } from "./auth.js";
+import { sessionAuthEnabled, type Config } from "./config.js";
+import { createXaiClient, type GrokClient } from "./grok/client.js";
+import { BodyError, errorResponse, json, noContent, readJsonBody, type RequestContext } from "./http.js";
+import { answerQuestion } from "./insights.js";
+import { errorCode, logEvent } from "./log.js";
+import { ORGS, DEFAULT_ORG, SUGGESTED_PROMPTS } from "./org.js";
+import { RATE_LIMITS, RateLimiter } from "./rateLimit.js";
+import type { FetchLike } from "./retrieval/types.js";
+
+export interface AppDeps {
+  config: Config;
+  fetch?: FetchLike;
+  /** Override for tests; defaults to the real xAI client when XAI_API_KEY is set. */
+  grok?: GrokClient | null;
+  limiter?: RateLimiter;
+  now?: () => number;
+}
+
+export type AppHandler = (request: Request, ctx: RequestContext) => Promise<Response>;
+
+const SERVICE = "liquid-accounting-analytics-bff";
+const HISTORY_TURN_MAX_CHARS = 1_500;
+
+function sanitizeHistory(value: unknown): ChatTurn[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((turn): turn is ChatTurn => Boolean(turn) && (turn.role === "user" || turn.role === "assistant") && typeof turn.content === "string")
+    .map((turn) => ({ role: turn.role, content: turn.content.slice(0, HISTORY_TURN_MAX_CHARS) }))
+    .slice(-HISTORY_MAX_TURNS);
+}
+
+function originAllowed(request: Request, config: Config): boolean {
+  const origin = request.headers.get("origin");
+  if (!origin) return true;
+  if (config.allowedOrigins.includes(origin)) return true;
+  // Same-origin requests on hosted deploys (incl. Vercel preview URLs).
+  const host = request.headers.get("host");
+  return Boolean(host) && (origin === `https://${host}` || (!config.isProductionLike && origin === `http://${host}`));
+}
+
+function connectorFlags(config: Config) {
+  return {
+    grok: Boolean(config.xai.apiKey),
+    linear: Boolean(config.linear.apiKey),
+    github: Boolean(config.github.token),
+    posthog: false,
+    sentry: false,
+    fixtures: config.allowFixtures,
+  };
+}
+
+export function createApp(deps: AppDeps): AppHandler {
+  const { config } = deps;
+  const fetchImpl: FetchLike = deps.fetch ?? ((input, init) => fetch(input, init));
+  const limiter = deps.limiter ?? new RateLimiter();
+  const now = deps.now ?? Date.now;
+  const grok =
+    deps.grok !== undefined
+      ? deps.grok
+      : config.xai.apiKey
+        ? createXaiClient({ apiKey: config.xai.apiKey, model: config.xai.model, timeoutMs: config.xai.timeoutMs, fetch: fetchImpl })
+        : null;
+
+  async function handleChat(request: Request, ctx: RequestContext): Promise<Response> {
+    if (!limiter.allow(RATE_LIMITS.chat, ctx.ip)) return errorResponse(429, ctx.requestId, "rate_limit_exceeded");
+    const body = await readJsonBody(request);
+    const message = typeof body.message === "string" ? body.message.trim() : "";
+    if (message.length < MESSAGE_MIN_CHARS || message.length > MESSAGE_MAX_CHARS) {
+      return errorResponse(400, ctx.requestId, "invalid_message", `Message must be ${MESSAGE_MIN_CHARS}–${MESSAGE_MAX_CHARS} characters.`);
+    }
+    if (body.orgId !== undefined && !ORGS.some((org) => org.id === body.orgId)) {
+      return errorResponse(400, ctx.requestId, "unknown_org");
+    }
+
+    const started = now();
+    const answer = await answerQuestion(message, sanitizeHistory(body.history), config, { fetch: fetchImpl, grok, now, requestId: ctx.requestId });
+    const latencyMs = now() - started;
+    logEvent("insights_chat", {
+      requestId: ctx.requestId,
+      provider: answer.provider,
+      connectors: answer.retrievalMeta.connectors,
+      connectorModes: answer.retrievalMeta.connectorModes,
+      itemCount: answer.retrievalMeta.itemCount,
+      truncated: answer.retrievalMeta.truncated,
+      messageLength: message.length,
+      latencyMs,
+    });
+    const payload: Omit<ChatResponse, "requestId"> = { ...answer, latencyMs };
+    return json(200, ctx.requestId, payload);
+  }
+
+  async function handleSession(request: Request, ctx: RequestContext): Promise<Response> {
+    if (request.method === "DELETE") return noContent(ctx.requestId, { "Set-Cookie": buildSessionCookie(config, null) });
+    if (!sessionAuthEnabled(config) || !config.sessionSecret) return errorResponse(503, ctx.requestId, "auth_not_configured");
+    if (!limiter.allow(RATE_LIMITS.session, ctx.ip)) return errorResponse(429, ctx.requestId, "rate_limit_exceeded");
+
+    const body = await readJsonBody(request);
+    if (!accessCodeMatches(body.accessCode, config)) {
+      logEvent("session_denied", { requestId: ctx.requestId });
+      return errorResponse(401, ctx.requestId, "invalid_access_code");
+    }
+    logEvent("session_created", { requestId: ctx.requestId });
+    return noContent(ctx.requestId, { "Set-Cookie": buildSessionCookie(config, createSessionToken(config.sessionSecret, now())) });
+  }
+
+  async function route(request: Request, ctx: RequestContext): Promise<Response> {
+    const { path } = ctx;
+    const method = request.method;
+
+    if (method === "GET" && (path === "/health" || path === "/api/health")) {
+      return json(200, ctx.requestId, { status: "ok", service: SERVICE, grok: grok ? "grok" : "fixture", connectors: connectorFlags(config) });
+    }
+    if (path === "/api/v1/session" && (method === "POST" || method === "DELETE")) return handleSession(request, ctx);
+
+    const auth = authenticate(request, config);
+    if (!auth.ok) {
+      logEvent("authentication_failure", { requestId: ctx.requestId, route: path });
+      return auth.reason === "auth_not_configured"
+        ? errorResponse(503, ctx.requestId, "auth_not_configured", "Set LIQUID_INSIGHTS_ACCESS_CODE and LIQUID_SESSION_SECRET.")
+        : errorResponse(401, ctx.requestId, "unauthorized");
+    }
+
+    if (method === "POST" && path === "/api/v1/insights/chat") return handleChat(request, ctx);
+    if (method !== "GET") return errorResponse(405, ctx.requestId, "method_not_allowed");
+
+    switch (path) {
+      case "/api/v1/organisation":
+        return json(200, ctx.requestId, DEFAULT_ORG);
+      case "/api/v1/orgs":
+        return json(200, ctx.requestId, { orgs: ORGS });
+      case "/api/v1/suggested-prompts":
+        return json(200, ctx.requestId, { prompts: SUGGESTED_PROMPTS });
+      case "/api/v1/connectors/status":
+        return json(200, ctx.requestId, { connectors: connectorFlags(config) });
+      default:
+        return errorResponse(404, ctx.requestId, "not_found");
+    }
+  }
+
+  return async function handle(request, ctx) {
+    if (!originAllowed(request, config)) return errorResponse(403, ctx.requestId, "origin_not_allowed");
+    if (request.method === "OPTIONS") return noContent(ctx.requestId);
+    if (!limiter.allow(RATE_LIMITS.general, ctx.ip)) return errorResponse(429, ctx.requestId, "rate_limit_exceeded");
+
+    try {
+      return await route(request, ctx);
+    } catch (error) {
+      if (error instanceof BodyError) return errorResponse(error.status, ctx.requestId, error.code);
+      logEvent("request_error", { requestId: ctx.requestId, route: ctx.path, error: errorCode(error) });
+      return errorResponse(500, ctx.requestId, "internal_error");
+    }
+  };
+}

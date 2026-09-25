@@ -1,0 +1,119 @@
+/**
+ * One chat turn: plan → retrieve → Grok synthesis (with one JSON repair) →
+ * citation mapping. Falls back to a canned sample answer or a deterministic
+ * digest — never to an answer that contradicts the retrieved sources.
+ */
+import type { ChatTurn, Citation, Provider, RetrievalMeta } from "../shared/contracts.js";
+import type { Config } from "./config.js";
+import { fixtureAnswerFor } from "./fixtures/responses.js";
+import type { GrokClient, GrokMessage } from "./grok/client.js";
+import { parseGrokResponse, type ParsedGrokAnswer } from "./grok/parseResponse.js";
+import { errorCode, logEvent } from "./log.js";
+import { GROK_INSIGHTS_SYSTEM_PROMPT, REPAIR_INSTRUCTION } from "./prompts/system.js";
+import { runRetrieval, type RetrievalDeps } from "./retrieval/index.js";
+import { planRetrieval, type RetrievalPlan } from "./retrieval/router.js";
+import type { RetrievedItem } from "./retrieval/types.js";
+
+export interface InsightAnswer {
+  reply: string;
+  citations: Citation[];
+  relatedQuestions: string[];
+  provider: Provider;
+  retrievalMeta: RetrievalMeta;
+}
+
+export interface InsightDeps extends RetrievalDeps {
+  grok: GrokClient | null;
+  requestId?: string;
+}
+
+const DIGEST_ITEMS = 6;
+const FALLBACK_CITATIONS = 3;
+const DEFAULT_FOLLOW_UPS = ["What's going on with LIQ-24?", "What merged on Reporting this week?", "Is assistant-unit passing on Core main?"];
+
+function buildMessages(message: string, history: ChatTurn[], context: string, meta: RetrievalMeta): GrokMessage[] {
+  const sampleNote = Object.entries(meta.connectorModes)
+    .map(([connector, mode]) => `${connector}=${mode}`)
+    .join(", ");
+  const retrieval = context || "(no matching items were retrieved)";
+  return [
+    { role: "system", content: GROK_INSIGHTS_SYSTEM_PROMPT },
+    ...history.map((turn) => ({ role: turn.role, content: turn.content })),
+    {
+      role: "user",
+      content: `RETRIEVAL (connectors: ${sampleNote}; window: ${meta.window}; truncated: ${meta.truncated})\n<<<\n${retrieval}\n>>>\n\nQUESTION: ${message}`,
+    },
+  ];
+}
+
+async function synthesize(grok: GrokClient, messages: GrokMessage[], knownIds: Set<string>): Promise<ParsedGrokAnswer | null> {
+  const first = await grok.complete(messages);
+  const parsed = parseGrokResponse(first, knownIds);
+  if (parsed) return parsed;
+  const repaired = await grok.complete([...messages, { role: "assistant", content: first.slice(0, 2_000) }, { role: "user", content: REPAIR_INSTRUCTION }]);
+  return parseGrokResponse(repaired, knownIds);
+}
+
+function citationsFor(ids: string[], items: RetrievedItem[]): Citation[] {
+  const byId = new Map(items.map((item) => [item.citation.id, item.citation]));
+  const cited = ids.map((id) => byId.get(id)).filter((c): c is Citation => Boolean(c));
+  // Contract: ≥1 citation whenever retrieval returned data.
+  return cited.length ? cited : items.slice(0, FALLBACK_CITATIONS).map((item) => item.citation);
+}
+
+export function digestAnswer(items: RetrievedItem[], reason: "unconfigured" | "failed"): Pick<InsightAnswer, "reply" | "citations" | "relatedQuestions"> {
+  if (!items.length) {
+    return {
+      reply: "**I couldn't find anything in Linear or GitHub for that.** Try a ticket id like LIQ-24, a repo name, or one of the suggested prompts.",
+      citations: [],
+      relatedQuestions: DEFAULT_FOLLOW_UPS,
+    };
+  }
+  const lead =
+    reason === "unconfigured"
+      ? "**Grok isn't connected, so here are the most relevant sources I found (not a summary):**"
+      : "**Grok didn't respond in time, so here are the most relevant sources I found (not a summary):**";
+  const top = items.slice(0, DIGEST_ITEMS);
+  const bullets = top.map((item) => `- **${item.citation.title}**${item.citation.status ? ` (${item.citation.status})` : ""} [${item.citation.id}]`);
+  return { reply: [lead, ...bullets].join("\n"), citations: top.map((item) => item.citation), relatedQuestions: DEFAULT_FOLLOW_UPS };
+}
+
+function fallbackAnswer(plan: RetrievalPlan, items: RetrievedItem[], meta: RetrievalMeta, reason: "unconfigured" | "failed"): Omit<InsightAnswer, "retrievalMeta"> {
+  const allSample = Object.values(meta.connectorModes).every((mode) => mode !== "live");
+  const fixture = allSample ? fixtureAnswerFor(plan.intent, plan.issueIds) : null;
+  const retrievedIds = new Set(items.map((item) => item.citation.id));
+  if (fixture && fixture.requires.every((id) => retrievedIds.has(id))) {
+    const parsed = parseGrokResponse(JSON.stringify({ reply: fixture.reply, citations: fixture.requires }), retrievedIds);
+    if (parsed) {
+      return { reply: parsed.reply, citations: citationsFor(parsed.citationIds, items), relatedQuestions: fixture.relatedQuestions, provider: "fixture" };
+    }
+  }
+  return { ...digestAnswer(items, reason), provider: "digest" };
+}
+
+export async function answerQuestion(message: string, history: ChatTurn[], config: Config, deps: InsightDeps): Promise<InsightAnswer> {
+  const plan = planRetrieval(message, config.github.repos);
+  const { context, items, meta } = await runRetrieval(plan, config, deps);
+
+  if (deps.grok && items.length) {
+    try {
+      const knownIds = new Set(items.map((item) => item.citation.id));
+      const parsed = await synthesize(deps.grok, buildMessages(message, history, context, meta), knownIds);
+      if (parsed) {
+        return {
+          reply: parsed.reply,
+          citations: citationsFor(parsed.citationIds, items),
+          relatedQuestions: parsed.relatedQuestions.length ? parsed.relatedQuestions : DEFAULT_FOLLOW_UPS,
+          provider: `grok:${deps.grok.model}`,
+          retrievalMeta: meta,
+        };
+      }
+      logEvent("grok_fallback", { requestId: deps.requestId, grok_error: "invalid_json_after_repair" });
+    } catch (error) {
+      logEvent("grok_fallback", { requestId: deps.requestId, grok_error: errorCode(error) });
+    }
+    return { ...fallbackAnswer(plan, items, meta, "failed"), retrievalMeta: meta };
+  }
+
+  return { ...fallbackAnswer(plan, items, meta, deps.grok ? "failed" : "unconfigured"), retrievalMeta: meta };
+}

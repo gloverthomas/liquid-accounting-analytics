@@ -1,0 +1,90 @@
+/**
+ * Environment → typed, validated config. Read once per process (or per test via
+ * `loadConfig(customEnv)`). Nothing here is ever sent to the browser.
+ */
+
+export interface Config {
+  /** True on Vercel or NODE_ENV=production — tightens auth defaults. */
+  isProductionLike: boolean;
+  allowedOrigins: string[];
+  demoToken: string | null;
+  /** Bearer demo token is honoured only in dev, or in prod behind an explicit flag. */
+  demoTokenEnabled: boolean;
+  accessCode: string | null;
+  sessionSecret: string | null;
+  allowFixtures: boolean;
+  xai: { apiKey: string | null; model: string; timeoutMs: number };
+  linear: { apiKey: string | null; teamId: string | null; teamKey: string };
+  github: { token: string | null; repos: string[]; branch: string };
+}
+
+type Env = Record<string, string | undefined>;
+
+const DEFAULT_MODEL = "grok-4-fast-non-reasoning";
+const DEFAULT_REPOS = ["gloverthomas/liquid-accounting-core", "gloverthomas/liquid-accounting-reporting"];
+const DEFAULT_XAI_TIMEOUT_MS = 12_000;
+const MIN_DEMO_TOKEN_CHARS = 16;
+const MIN_ACCESS_CODE_CHARS = 8;
+const MIN_SESSION_SECRET_CHARS = 32;
+const REPO_PATTERN = /^[\w.-]+\/[\w.-]+$/;
+
+function str(env: Env, key: string): string | null {
+  const value = env[key]?.trim();
+  return value ? value : null;
+}
+
+function atLeast(value: string | null, min: number): string | null {
+  return value && value.length >= min ? value : null;
+}
+
+function parseRepos(raw: string | null): string[] {
+  if (!raw) return DEFAULT_REPOS;
+  const repos = raw
+    .split(",")
+    .map((repo) => repo.trim())
+    .filter((repo) => REPO_PATTERN.test(repo));
+  return repos.length ? repos : DEFAULT_REPOS;
+}
+
+function parseTimeout(raw: string | null): number {
+  const value = Number.parseInt(raw ?? "", 10);
+  return Number.isFinite(value) && value >= 1_000 && value <= 60_000 ? value : DEFAULT_XAI_TIMEOUT_MS;
+}
+
+export function loadConfig(env: Env = process.env): Config {
+  const isProductionLike = env.VERCEL === "1" || env.NODE_ENV === "production";
+  const demoToken = atLeast(str(env, "LIQUID_BFF_DEMO_TOKEN"), MIN_DEMO_TOKEN_CHARS);
+  const demoTokenFlag = str(env, "LIQUID_ALLOW_DEMO_TOKEN") === "true";
+
+  return {
+    isProductionLike,
+    allowedOrigins: (str(env, "LIQUID_INSIGHTS_APP_ORIGIN") ?? "http://localhost:5173")
+      .split(",")
+      .map((origin) => origin.trim())
+      .filter(Boolean),
+    demoToken,
+    demoTokenEnabled: Boolean(demoToken) && (!isProductionLike || demoTokenFlag),
+    accessCode: atLeast(str(env, "LIQUID_INSIGHTS_ACCESS_CODE"), MIN_ACCESS_CODE_CHARS),
+    sessionSecret: atLeast(str(env, "LIQUID_SESSION_SECRET"), MIN_SESSION_SECRET_CHARS),
+    allowFixtures: str(env, "LIQUID_INSIGHTS_ALLOW_FIXTURES") !== "false",
+    xai: {
+      apiKey: str(env, "XAI_API_KEY"),
+      model: str(env, "XAI_MODEL") ?? DEFAULT_MODEL,
+      timeoutMs: parseTimeout(str(env, "XAI_TIMEOUT_MS")),
+    },
+    linear: {
+      apiKey: str(env, "LINEAR_API_KEY"),
+      teamId: str(env, "LINEAR_TEAM_ID"),
+      teamKey: str(env, "LINEAR_TEAM_KEY") ?? "LIQ",
+    },
+    github: {
+      token: str(env, "GITHUB_TOKEN"),
+      repos: parseRepos(str(env, "GITHUB_REPOS")),
+      branch: str(env, "GITHUB_BRANCH") ?? "main",
+    },
+  };
+}
+
+export function sessionAuthEnabled(config: Config): boolean {
+  return Boolean(config.accessCode && config.sessionSecret);
+}

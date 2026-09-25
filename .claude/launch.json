@@ -1,0 +1,6 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    { "name": "insights", "runtimeExecutable": "npm", "runtimeArgs": ["run", "dev:all"], "port": 5173 }
+  ]
+}
