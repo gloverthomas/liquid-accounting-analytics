@@ -247,6 +247,17 @@ a { color: inherit; }
 .answer-mark { width: 20px; height: 20px; display: block; }
 .answer-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-bottom: var(--space-3); font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-muted); }
 .badge { display: inline-flex; align-items: center; gap: 6px; border-radius: var(--radius-pill); padding: 2px 8px; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; }
+.badge-writing { color: var(--color-muted); background: var(--status-neutral-wash); animation: writing-pulse 1.4s ease-in-out infinite; }
+@keyframes writing-pulse { 50% { opacity: 0.55; } }
+/* A caret after the last streamed word. */
+.answer.streaming .md > :last-child:not(ul, ol)::after,
+.answer.streaming .md > :is(ul, ol):last-child > li:last-child::after {
+  content: ""; display: inline-block; width: 0.5em; height: 1em; margin-left: 2px; vertical-align: -0.12em;
+  background: var(--color-accent); border-radius: 1px; animation: caret-blink 1s steps(2, start) infinite;
+}
+@keyframes caret-blink { to { visibility: hidden; } }
+@media (prefers-reduced-motion: reduce) { .badge-writing, .answer.streaming .md > :last-child:not(ul, ol)::after,
+.answer.streaming .md > :is(ul, ol):last-child > li:last-child::after { animation: none; } }
 .badge-live { background: var(--status-good-wash); color: var(--status-good); }
 .badge-sample { background: var(--status-wait-wash); color: var(--status-wait); }
 .badge-digest { background: var(--status-neutral-wash); color: var(--status-neutral); }

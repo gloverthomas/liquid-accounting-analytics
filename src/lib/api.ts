@@ -2,7 +2,7 @@
  * Same-origin API client. Auth is handled outside the bundle: the Vite proxy
  * adds the demo bearer in dev; hosted deploys use an HttpOnly session cookie.
  */
-import type { ApiError, ChatRequest, ChatResponse, Organisation, SuggestedPrompt } from "../../shared/contracts";
+import type { ApiError, ChatRequest, ChatResponse, ChatStreamEvent, Organisation, SuggestedPrompt } from "../../shared/contracts";
 
 export class ApiRequestError extends Error {
   constructor(
@@ -33,11 +33,74 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return body;
 }
 
+/** Reads NDJSON events, calling onDelta for reply text; resolves with the final validated answer. */
+async function readAnswerStream(res: Response, onDelta: (text: string) => void): Promise<ChatResponse> {
+  if (!res.body) throw new ApiRequestError(res.status, "invalid_response");
+  const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+  let pending = "";
+  const handle = (line: string): ChatResponse | null => {
+    if (!line.trim()) return null;
+    let event: ChatStreamEvent;
+    try {
+      event = JSON.parse(line) as ChatStreamEvent;
+    } catch {
+      throw new ApiRequestError(res.status, "invalid_response");
+    }
+    if (event.type === "delta") onDelta(event.text);
+    if (event.type === "error") throw new ApiRequestError(500, event.error, event.requestId);
+    return event.type === "done" ? event.response : null;
+  };
+  for (;;) {
+    let chunk: ReadableStreamReadResult<string>;
+    try {
+      chunk = await reader.read();
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") throw error;
+      throw new ApiRequestError(0, "network_error");
+    }
+    if (chunk.done) break;
+    pending += chunk.value;
+    const lines = pending.split("\n");
+    pending = lines.pop() ?? "";
+    for (const line of lines) {
+      const done = handle(line);
+      if (done) return done;
+    }
+  }
+  const last = handle(pending);
+  if (last) return last;
+  // The stream ended without an answer (connection dropped mid-answer).
+  throw new ApiRequestError(0, "network_error");
+}
+
+/** Streams an answer. Errors before streaming (401, 429, 400…) come back as normal JSON errors. */
+async function chatStream(body: ChatRequest, onDelta: (text: string) => void, signal?: AbortSignal): Promise<ChatResponse> {
+  let res: Response;
+  try {
+    res = await fetch("/api/v1/insights/chat/stream", {
+      method: "POST",
+      body: JSON.stringify(body),
+      signal,
+      credentials: "same-origin",
+      headers: { Accept: "application/x-ndjson, application/json", "Content-Type": "application/json" },
+    });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") throw error;
+    throw new ApiRequestError(0, "network_error");
+  }
+  if (res.ok && res.headers.get("Content-Type")?.includes("ndjson")) return readAnswerStream(res, onDelta);
+  const json = (await res.json().catch(() => null)) as (ChatResponse & Partial<ApiError>) | null;
+  if (!res.ok) throw new ApiRequestError(res.status, json?.error ?? `http_${res.status}`, json?.requestId);
+  if (json === null) throw new ApiRequestError(res.status, "invalid_response");
+  return json;
+}
+
 export const api = {
   organisation: () => request<Organisation>("/api/v1/organisation"),
   orgs: () => request<{ orgs: Organisation[] }>("/api/v1/orgs").then((r) => r.orgs),
   suggestedPrompts: () => request<{ prompts: SuggestedPrompt[] }>("/api/v1/suggested-prompts").then((r) => r.prompts),
   chat: (body: ChatRequest, signal?: AbortSignal) => request<ChatResponse>("/api/v1/insights/chat", { method: "POST", body: JSON.stringify(body), signal }),
+  chatStream,
   progress: (message: string) => request<{ steps: string[] }>("/api/v1/insights/progress", { method: "POST", body: JSON.stringify({ message }) }).then((r) => r.steps),
   confirmTransition: (token: string) => request<ChatResponse>("/api/v1/actions/linear-transition", { method: "POST", body: JSON.stringify({ token }) }),
   confirmImplement: (token: string) => request<ChatResponse>("/api/v1/actions/workflow-implement", { method: "POST", body: JSON.stringify({ token }) }),

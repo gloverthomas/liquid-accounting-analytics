@@ -59,7 +59,20 @@ async function toWebRequest(req: IncomingMessage): Promise<Request> {
 async function sendWebResponse(response: Response, res: ServerResponse): Promise<void> {
   res.statusCode = response.status;
   response.headers.forEach((value, key) => res.setHeader(key, value));
-  res.end(Buffer.from(await response.arrayBuffer()));
+  if (!response.body) {
+    res.end();
+    return;
+  }
+  // Write chunks as they come so streamed answers (NDJSON) reach the browser live.
+  res.flushHeaders();
+  const reader = response.body.getReader();
+  res.on("close", () => void reader.cancel().catch(() => undefined));
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    res.write(value);
+  }
+  res.end();
 }
 
 const server = createServer(async (req, res) => {

@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { ChatResponse } from "../../shared/contracts";
 import type { ThreadEntry } from "../hooks/useInsightsChat";
 import { ActionProposal } from "./ActionProposal";
+import { tidyStreaming } from "../lib/markdown";
 import { AnswerMarkdown } from "./AnswerMarkdown";
 import { Chart } from "./Chart";
 import { PipelineTimeline } from "./PipelineTimeline";
@@ -15,6 +16,8 @@ interface ChatThreadProps {
   isSending: boolean;
   /** Real progress steps for the in-flight question, when known. */
   progress?: string[];
+  /** The in-flight answer as it's written (streamed). */
+  streaming?: string;
   /** Set when the last question never got an answer (e.g. the page was reloaded mid-request). */
   interruptedQuestion?: string;
   onAsk: (query: string) => void;
@@ -103,7 +106,23 @@ function PendingCard({ steps }: { steps?: string[] }) {
   );
 }
 
-export function ChatThread({ entries, isSending, progress, interruptedQuestion, onAsk, onRetry, onConfirmAction, onDismissAction }: ChatThreadProps) {
+const NO_CITATIONS: ReadonlyMap<string, number> = new Map();
+
+/** The answer while Grok writes it. Citation numbers appear when the final, validated answer lands. */
+function StreamingCard({ text }: { text: string }) {
+  return (
+    <article className="answer streaming" aria-label="Liquid Insights answer, being written" aria-busy="true" aria-live="off">
+      <header className="answer-head">
+        <img className="answer-mark" src="/brand/liquid-mark.png" alt="" width={20} height={20} />
+        <span>Liquid Insights</span>
+        <span className="badge badge-writing">Writing…</span>
+      </header>
+      <AnswerMarkdown text={tidyStreaming(text)} citationIndex={NO_CITATIONS} anchorPrefix="streaming" />
+    </article>
+  );
+}
+
+export function ChatThread({ entries, isSending, progress, streaming, interruptedQuestion, onAsk, onRetry, onConfirmAction, onDismissAction }: ChatThreadProps) {
   const threadRef = useRef<HTMLElement>(null);
 
   // Keep the latest question pinned at the top so its answer reads beneath it.
@@ -159,7 +178,7 @@ export function ChatThread({ entries, isSending, progress, interruptedQuestion, 
           </div>
         </div>
       ) : null}
-      {isSending ? <PendingCard steps={progress} /> : null}
+      {isSending ? streaming ? <StreamingCard text={streaming} /> : <PendingCard steps={progress} /> : null}
     </section>
   );
 }

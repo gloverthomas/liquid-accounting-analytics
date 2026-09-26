@@ -12,6 +12,7 @@ import type { Config } from "./config.js";
 import { fixtureAnswerFor } from "./fixtures/responses.js";
 import type { GrokClient, GrokMessage } from "./grok/client.js";
 import { parseGrokResponse, type ParsedGrokAnswer } from "./grok/parseResponse.js";
+import { createReplyExtractor } from "./grok/replyStream.js";
 import { errorCode, logEvent } from "./log.js";
 import { ANSWER_STYLES, GROK_INSIGHTS_SYSTEM_PROMPT, REPAIR_INSTRUCTION } from "./prompts/system.js";
 import { runRetrieval, type RetrievalDeps } from "./retrieval/index.js";
@@ -32,6 +33,8 @@ export interface InsightAnswer {
 export interface InsightDeps extends RetrievalDeps {
   grok: GrokClient | null;
   requestId?: string;
+  /** Streaming only: receives the answer text as Grok writes it (before validation). */
+  onReplyDelta?: (text: string) => void;
 }
 
 const DIGEST_ITEMS = 6;
@@ -54,8 +57,17 @@ function buildMessages(message: string, history: ChatTurn[], context: string, me
   ];
 }
 
-async function synthesize(grok: GrokClient, messages: GrokMessage[], knownIds: Set<string>): Promise<ParsedGrokAnswer | null> {
-  const first = await grok.complete(messages);
+async function synthesize(grok: GrokClient, messages: GrokMessage[], knownIds: Set<string>, onReplyDelta?: (text: string) => void): Promise<ParsedGrokAnswer | null> {
+  let first: string;
+  if (onReplyDelta && grok.stream) {
+    const reply = createReplyExtractor();
+    first = await grok.stream(messages, (chunk) => {
+      const text = reply.push(chunk);
+      if (text) onReplyDelta(text);
+    });
+  } else {
+    first = await grok.complete(messages);
+  }
   const parsed = parseGrokResponse(first, knownIds);
   if (parsed) return parsed;
   const repaired = await grok.complete([...messages, { role: "assistant", content: first.slice(0, 2_000) }, { role: "user", content: REPAIR_INSTRUCTION }]);
@@ -143,7 +155,7 @@ export async function answerQuestion(message: string, history: ChatTurn[], confi
   if (deps.grok && items.length) {
     try {
       const knownIds = new Set(items.map((item) => item.citation.id));
-      const parsed = await synthesize(deps.grok, buildMessages(message, history, context, meta, plan), knownIds);
+      const parsed = await synthesize(deps.grok, buildMessages(message, history, context, meta, plan), knownIds, deps.onReplyDelta);
       if (parsed) {
         return {
           reply: parsed.reply,

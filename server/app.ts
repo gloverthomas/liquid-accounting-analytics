@@ -2,13 +2,13 @@
  * Framework-free BFF: `(Request, ctx) → Response`. The local Node server and the
  * Vercel function are thin adapters around this, so both enforce identical rules.
  */
-import { HISTORY_MAX_TURNS, MESSAGE_MAX_CHARS, MESSAGE_MIN_CHARS, type ChatResponse, type ChatTurn } from "../shared/contracts.js";
+import { HISTORY_MAX_TURNS, MESSAGE_MAX_CHARS, MESSAGE_MIN_CHARS, type ChatResponse, type ChatStreamEvent, type ChatTurn } from "../shared/contracts.js";
 import { ActionError, executeTransition } from "./actions/linearTransition.js";
 import { executeImplement } from "./actions/workflowImplement.js";
 import { accessCodeMatches, authenticate, buildSessionCookie, createSessionToken, sessionCookieName } from "./auth.js";
 import { sessionAuthEnabled, type Config } from "./config.js";
 import { createXaiClient, type GrokClient } from "./grok/client.js";
-import { BodyError, errorResponse, json, noContent, parseCookies, readJsonBody, type RequestContext } from "./http.js";
+import { BodyError, errorResponse, json, ndjsonStream, noContent, parseCookies, readJsonBody, type RequestContext } from "./http.js";
 import { answerQuestion } from "./insights.js";
 import { progressSteps } from "./progress.js";
 import { detectTicketAction } from "./actions/linearTransition.js";
@@ -85,7 +85,13 @@ export function createApp(deps: AppDeps): AppHandler {
         ? createXaiClient({ apiKey: config.xai.apiKey, model: config.xai.model, timeoutMs: config.xai.timeoutMs, fetch: fetchImpl })
         : null;
 
-  async function handleChat(request: Request, ctx: RequestContext): Promise<Response> {
+  interface ChatInput {
+    message: string;
+    history: ChatTurn[];
+  }
+
+  /** Rate limit + validation shared by the JSON and streaming chat routes. Returns an error Response or the input. */
+  async function readChat(request: Request, ctx: RequestContext): Promise<Response | ChatInput> {
     if (!limiter.allow(RATE_LIMITS.chat, ctx.ip)) return errorResponse(429, ctx.requestId, "rate_limit_exceeded");
     const body = await readJsonBody(request);
     const message = typeof body.message === "string" ? body.message.trim() : "";
@@ -95,7 +101,16 @@ export function createApp(deps: AppDeps): AppHandler {
     if (body.orgId !== undefined && !ORGS.some((org) => org.id === body.orgId)) {
       return errorResponse(400, ctx.requestId, "unknown_org");
     }
+    return { message, history: sanitizeHistory(body.history) };
+  }
 
+  /** Answers, records the question-log event and logs. Throws (after recording) on failure. */
+  async function runChat(
+    { message, history }: ChatInput,
+    request: Request,
+    ctx: RequestContext,
+    onReplyDelta?: (text: string) => void,
+  ): Promise<Omit<ChatResponse, "requestId">> {
     const started = now();
     const action = detectTicketAction(message);
     const help = isHelpQuestion(message);
@@ -111,7 +126,7 @@ export function createApp(deps: AppDeps): AppHandler {
 
     let answer: Awaited<ReturnType<typeof answerQuestion>>;
     try {
-      answer = await answerQuestion(message, sanitizeHistory(body.history), config, { fetch: fetchImpl, grok, now, requestId: ctx.requestId });
+      answer = await answerQuestion(message, history, config, { fetch: fetchImpl, grok, now, requestId: ctx.requestId, onReplyDelta });
     } catch (error) {
       await record({ sources: [], answerType: "none", outcome: "error", latencyMs: now() - started, citationCount: 0 });
       throw error;
@@ -136,9 +151,30 @@ export function createApp(deps: AppDeps): AppHandler {
       truncated: answer.retrievalMeta.truncated,
       messageLength: message.length,
       latencyMs,
+      streamed: Boolean(onReplyDelta),
     });
-    const payload: Omit<ChatResponse, "requestId"> = { ...answer, latencyMs };
-    return json(200, ctx.requestId, payload);
+    return { ...answer, latencyMs };
+  }
+
+  async function handleChat(request: Request, ctx: RequestContext): Promise<Response> {
+    const input = await readChat(request, ctx);
+    if (input instanceof Response) return input;
+    return json(200, ctx.requestId, await runChat(input, request, ctx));
+  }
+
+  /** Same answer as handleChat, but the reply text streams as Grok writes it, then a final "done" event. */
+  async function handleChatStream(request: Request, ctx: RequestContext): Promise<Response> {
+    const input = await readChat(request, ctx);
+    if (input instanceof Response) return input;
+    return ndjsonStream(ctx.requestId, async (send) => {
+      try {
+        const payload = await runChat(input, request, ctx, (text) => send({ type: "delta", text } satisfies ChatStreamEvent));
+        send({ type: "done", response: { requestId: ctx.requestId, ...payload } } satisfies ChatStreamEvent);
+      } catch (error) {
+        logEvent("request_error", { requestId: ctx.requestId, route: ctx.path, error: errorCode(error) });
+        send({ type: "error", error: "internal_error", requestId: ctx.requestId } satisfies ChatStreamEvent);
+      }
+    });
   }
 
   async function handleTransition(request: Request, ctx: RequestContext, run = executeTransition): Promise<Response> {
@@ -189,6 +225,7 @@ export function createApp(deps: AppDeps): AppHandler {
     }
 
     if (method === "POST" && path === "/api/v1/insights/chat") return handleChat(request, ctx);
+    if (method === "POST" && path === "/api/v1/insights/chat/stream") return handleChatStream(request, ctx);
     if (method === "POST" && path === "/api/v1/insights/progress") {
       const body = await readJsonBody(request);
       const message = typeof body.message === "string" ? body.message.trim() : "";

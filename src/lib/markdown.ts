@@ -23,3 +23,13 @@ export function parseBlocks(text: string): Block[] {
   }
   return blocks;
 }
+
+/**
+ * Makes half-written markdown render cleanly: hides a citation token still being
+ * written ("[linear:LIQ-2") and closes a bold phrase that's still open.
+ */
+export function tidyStreaming(raw: string): string {
+  const text = raw.replace(/\[[a-z]*(:[^\]\s]*)?$/i, "");
+  if ((text.match(/\*\*/g)?.length ?? 0) % 2 === 0) return text;
+  return text.endsWith("**") ? text.slice(0, -2) : `${text}**`;
+}

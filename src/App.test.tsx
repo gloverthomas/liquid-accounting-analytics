@@ -30,7 +30,7 @@ describe("App", () => {
     route({
       "/api/v1/orgs": () => jsonRes(ORGS),
       "/api/v1/suggested-prompts": () => jsonRes(PROMPTS),
-      "/api/v1/insights/chat": () => jsonRes(chatResponse()),
+      "/api/v1/insights/chat/stream": () => jsonRes(chatResponse()),
     });
     render(<App />);
 
@@ -47,11 +47,58 @@ describe("App", () => {
     expect(screen.getByPlaceholderText("Ask a follow-up…")).toBeInTheDocument();
   });
 
+  it("streams the answer as it's written, then swaps in the cited answer", async () => {
+    let push!: (line: object) => void;
+    let close!: () => void;
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        const enc = new TextEncoder();
+        push = (line) => controller.enqueue(enc.encode(`${JSON.stringify(line)}\n`));
+        close = () => controller.close();
+      },
+    });
+    route({
+      "/api/v1/orgs": () => jsonRes(ORGS),
+      "/api/v1/suggested-prompts": () => jsonRes(PROMPTS),
+      "/api/v1/insights/progress": () => jsonRes({ requestId: "r", steps: ["Reading LIQ-24 in Linear…"] }),
+      "/api/v1/insights/chat/stream": () => new Response(body, { headers: { "Content-Type": "application/x-ndjson" } }),
+    });
+    render(<App />);
+    await userEvent.click(await screen.findByRole("button", { name: /Open LIQ-24 status/ }));
+
+    push({ type: "delta", text: "**LIQ-24 is " });
+    push({ type: "delta", text: "In Progress.** [linear:LI" });
+    const live = await screen.findByRole("article", { name: "Liquid Insights answer, being written" });
+    await waitFor(() => expect(live).toHaveTextContent("LIQ-24 is In Progress."));
+    expect(live).not.toHaveTextContent("[linear:");
+    expect(within(live).getByText("Writing…")).toBeInTheDocument();
+
+    push({ type: "done", response: chatResponse() });
+    close();
+    expect(await screen.findByRole("article", { name: "Liquid Insights answer" })).toBeInTheDocument();
+    expect(screen.queryByRole("article", { name: "Liquid Insights answer, being written" })).toBeNull();
+  });
+
+  it("shows an error card when the stream reports a failure", async () => {
+    const lines = `${JSON.stringify({ type: "delta", text: "Partial" })}\n${JSON.stringify({ type: "error", error: "internal_error", requestId: "r" })}\n`;
+    route({
+      "/api/v1/orgs": () => jsonRes(ORGS),
+      "/api/v1/suggested-prompts": () => jsonRes(PROMPTS),
+      "/api/v1/insights/progress": () => jsonRes({ requestId: "r", steps: [] }),
+      "/api/v1/insights/chat/stream": () => new Response(lines, { headers: { "Content-Type": "application/x-ndjson" } }),
+    });
+    render(<App />);
+    await userEvent.click(await screen.findByRole("button", { name: /Open LIQ-24 status/ }));
+    expect(await screen.findByText(/couldn't answer/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
+    expect(screen.queryByText("Partial")).toBeNull();
+  });
+
   it("sends typed questions with Enter, supports Shift+Enter, and can start over", async () => {
     route({
       "/api/v1/orgs": () => jsonRes(ORGS),
       "/api/v1/suggested-prompts": () => jsonRes(PROMPTS),
-      "/api/v1/insights/chat": () => jsonRes(chatResponse({ provider: "fixture", retrievalMeta: { ...chatResponse().retrievalMeta, connectorModes: { linear: "sample" } } })),
+      "/api/v1/insights/chat/stream": () => jsonRes(chatResponse({ provider: "fixture", retrievalMeta: { ...chatResponse().retrievalMeta, connectorModes: { linear: "sample" } } })),
     });
     render(<App />);
     const box = await screen.findByRole("textbox");
@@ -59,7 +106,7 @@ describe("App", () => {
 
     await userEvent.type(box, "Line one{Shift>}{Enter}{/Shift}line two{Enter}");
     expect(await screen.findByText("Sample data")).toBeInTheDocument();
-    const [, init] = fetchMock.mock.calls.find(([p]) => p === "/api/v1/insights/chat")!;
+    const [, init] = fetchMock.mock.calls.find(([p]) => p === "/api/v1/insights/chat/stream")!;
     expect(JSON.parse(String(init!.body)).message).toBe("Line one\nline two");
 
     // Top-right "New conversation" returns to the hero; the chat stays in the sidebar history.
@@ -99,7 +146,7 @@ describe("App", () => {
     });
     const base = fetchMock.getMockImplementation()!;
     fetchMock.mockImplementation(async (input, init) =>
-      String(input) === "/api/v1/insights/chat" ? new Promise<Response>((r) => (release = () => r(jsonRes(chatResponse())))) : base(input, init),
+      String(input) === "/api/v1/insights/chat/stream" ? new Promise<Response>((r) => (release = () => r(jsonRes(chatResponse())))) : base(input, init),
     );
     render(<App />);
     await userEvent.type(await screen.findByRole("textbox"), "Is AI Assistant usage going up?{Enter}");
@@ -117,7 +164,7 @@ describe("App", () => {
     route({
       "/api/v1/orgs": () => jsonRes(ORGS),
       "/api/v1/suggested-prompts": () => jsonRes(PROMPTS),
-      "/api/v1/insights/chat": () => jsonRes(chatResponse()),
+      "/api/v1/insights/chat/stream": () => jsonRes(chatResponse()),
     });
     render(<App />);
     await userEvent.click(await screen.findByRole("button", { name: /^Unanswered/ }));
@@ -189,7 +236,7 @@ describe("App", () => {
       route({
         "/api/v1/orgs": () => jsonRes(ORGS),
         "/api/v1/suggested-prompts": () => jsonRes(PROMPTS),
-        "/api/v1/insights/chat": () => jsonRes(proposed),
+        "/api/v1/insights/chat/stream": () => jsonRes(proposed),
         "/api/v1/actions/linear-transition": () => {
           transitions++;
           return jsonRes(moved);
@@ -211,7 +258,7 @@ describe("App", () => {
     });
 
     it("Cancel retires the card without calling Linear", async () => {
-      route({ "/api/v1/orgs": () => jsonRes(ORGS), "/api/v1/suggested-prompts": () => jsonRes(PROMPTS), "/api/v1/insights/chat": () => jsonRes(proposed) });
+      route({ "/api/v1/orgs": () => jsonRes(ORGS), "/api/v1/suggested-prompts": () => jsonRes(PROMPTS), "/api/v1/insights/chat/stream": () => jsonRes(proposed) });
       render(<App />);
       await userEvent.type(await screen.findByRole("textbox"), "Move LIQ-17 to In Progress{Enter}");
       const card = await screen.findByRole("region", { name: "Confirm moving LIQ-17" });
@@ -225,7 +272,7 @@ describe("App", () => {
       route({
         "/api/v1/orgs": () => jsonRes(ORGS),
         "/api/v1/suggested-prompts": () => jsonRes(PROMPTS),
-        "/api/v1/insights/chat": () => jsonRes(proposed),
+        "/api/v1/insights/chat/stream": () => jsonRes(proposed),
         "/api/v1/actions/linear-transition": () => jsonRes({ requestId: "r", error: status === 410 ? "confirmation_expired" : "internal_error" }, status),
       });
       render(<App />);
@@ -246,7 +293,7 @@ describe("App", () => {
       route({
         "/api/v1/orgs": () => jsonRes(ORGS),
         "/api/v1/suggested-prompts": () => jsonRes(PROMPTS),
-        "/api/v1/insights/chat": () => jsonRes(chatResponse({ reply: "**Plan for LIQ-24.**", relatedQuestions: [], proposedAction: implement })),
+        "/api/v1/insights/chat/stream": () => jsonRes(chatResponse({ reply: "**Plan for LIQ-24.**", relatedQuestions: [], proposedAction: implement })),
         "/api/v1/actions/workflow-implement": () => jsonRes(chatResponse({ provider: "action", reply: "**Approved the Cursor plan for LIQ-24.**", relatedQuestions: [] })),
       });
       render(<App />);

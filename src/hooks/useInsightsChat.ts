@@ -10,13 +10,15 @@ import type { ConversationsApi, ThreadEntry } from "./useConversations";
 
 export type { ThreadEntry } from "./useConversations";
 
-type Store = Pick<ConversationsApi, "entriesOf" | "update" | "isPending" | "setPending" | "stepsOf" | "setSteps">;
+type Store = Pick<ConversationsApi, "entriesOf" | "update" | "isPending" | "setPending" | "stepsOf" | "setSteps" | "streamOf" | "appendStream" | "clearStream">;
 
 export interface InsightsChat {
   entries: ThreadEntry[];
   isSending: boolean;
   /** What the server is doing for the in-flight question, when known. */
   progress: string[] | undefined;
+  /** The answer as it's being written (streamed), before it's validated and cited. */
+  streaming: string | undefined;
   send: (message: string) => Promise<void>;
   retry: (message: string) => Promise<void>;
   /** Runs a proposed ticket move. Resolves to an error message to show inline, or null on success. */
@@ -70,16 +72,30 @@ export function useInsightsChat(orgId: string | undefined, conversationId: strin
           if (storeRef.current.isPending(id)) storeRef.current.setSteps(id, steps);
         })
         .catch(() => undefined);
+      // Coalesce streamed fragments to at most one render per frame.
+      let buffered = "";
+      let frame = 0;
+      const flush = () => {
+        frame = 0;
+        if (buffered && !controller.signal.aborted) storeRef.current.appendStream(id, buffered);
+        buffered = "";
+      };
+      const onDelta = (text: string) => {
+        buffered += text;
+        if (!frame) frame = requestAnimationFrame(flush);
+      };
       try {
-        const response = await api.chat({ message, history, orgId }, controller.signal);
+        const response = await api.chatStream({ message, history, orgId }, onDelta, controller.signal);
         storeRef.current.update(id, (prev) => [...prev, { id: nextId("a"), role: "assistant", response }]);
       } catch (error) {
         if (controller.signal.aborted) return;
         storeRef.current.update(id, (prev) => [...prev, { id: nextId("e"), role: "error", message: describeError(error), retryOf: message }]);
       } finally {
+        if (frame) cancelAnimationFrame(frame);
         if (inFlight.get(id) === controller) inFlight.delete(id);
         storeRef.current.setPending(id, false);
         storeRef.current.setSteps(id, undefined);
+        storeRef.current.clearStream(id);
       }
     },
     [orgId],
@@ -156,6 +172,7 @@ export function useInsightsChat(orgId: string | undefined, conversationId: strin
     entries: store.entriesOf(conversationId),
     isSending: store.isPending(conversationId),
     progress: store.stepsOf(conversationId),
+    streaming: store.streamOf(conversationId),
     send,
     retry,
     confirmAction,

@@ -23,6 +23,17 @@ server/app.ts          (Request, ctx) → Response   ← all routing, auth, limi
    - When every connector was in sample mode and the canned answer's sources were all retrieved, a canned answer is used (`provider: "fixture"`).
    - Otherwise the reply is a plain list of the top sources (`provider: "digest"`), so the answer text can never contradict the sources shown.
 
+## Streaming (`POST /api/v1/insights/chat/stream`)
+
+The app uses this route; `/api/v1/insights/chat` stays as the plain JSON version of the same turn.
+
+- **Same pipeline:** validation, retrieval, the Grok call, validation and fallbacks are identical, and so is the telemetry. Validation errors (400, 401, 429…) come back as ordinary JSON before any streaming starts.
+- **Grok streams** (`stream: true`). `grok/replyStream.ts` decodes the `"reply"` field out of the partial JSON as it arrives, so only answer text is sent, never raw JSON.
+- **Wire format:** newline-delimited JSON (`application/x-ndjson`):
+  - `{"type":"delta","text":"…"}` while Grok writes. This text is unvalidated, and may include citation IDs that are later removed.
+  - Then exactly one `{"type":"done","response":ChatResponse}`, or `{"type":"error","error":"internal_error","requestId":"…"}`.
+- **The client** shows deltas in a "Writing…" card with inline citations hidden, then replaces it with the validated, cited answer from `done`. Answers that don't use Grok (actions, help, digests) send only `done`.
+
 ## Caching
 
 Only retrieval is cached, in a per-instance TTL/LRU store holding up to 200 entries. Grok answers are never cached.

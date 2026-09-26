@@ -144,3 +144,9 @@ export interface ApiError {
 export const MESSAGE_MIN_CHARS = 2;
 export const MESSAGE_MAX_CHARS = 2000;
 export const HISTORY_MAX_TURNS = 6;
+
+/** Events on POST /api/v1/insights/chat/stream (one JSON object per line). */
+export type ChatStreamEvent =
+  | { type: "delta"; text: string }
+  | { type: "done"; response: ChatResponse }
+  | { type: "error"; error: string; requestId: string };

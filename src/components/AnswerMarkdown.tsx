@@ -14,7 +14,7 @@ interface AnswerMarkdownProps {
   anchorPrefix: string;
 }
 
-const INLINE = /(\*\*[^*]+\*\*|`[^`]+`|_[^_\s][^_]*_|\[(?:linear|github|posthog|sentry):[^\]\s]+\])/g;
+const INLINE = /(\*\*[^*]+\*\*|`[^`]+`|_[^_\s][^_]*_|\[(?:linear|github|posthog|sentry|workflow):[^\]\s]+\])/g;
 
 function renderInline(text: string, props: AnswerMarkdownProps, key: string): ReactNode[] {
   return text.split(INLINE).map((part, i) => {

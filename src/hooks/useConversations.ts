@@ -37,6 +37,10 @@ export interface ConversationsApi {
   /** Progress steps for an in-flight question (what's actually being fetched). */
   stepsOf: (id: string) => string[] | undefined;
   setSteps: (id: string, steps: string[] | undefined) => void;
+  /** Answer text streamed so far for an in-flight question (not yet validated or cited). */
+  streamOf: (id: string) => string | undefined;
+  appendStream: (id: string, text: string) => void;
+  clearStream: (id: string) => void;
 }
 
 const newId = () => `c-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -51,6 +55,7 @@ export function useConversations(now: () => number = Date.now): ConversationsApi
   const [activeId, setActiveId] = useState<string>(newId);
   const [pending, setPendingIds] = useState<ReadonlySet<string>>(() => new Set());
   const [steps, setStepsMap] = useState<ReadonlyMap<string, string[]>>(() => new Map());
+  const [streams, setStreams] = useState<ReadonlyMap<string, string>>(() => new Map());
   // Mirror for synchronous reads inside async callbacks (history for the next request).
   const listRef = useRef(conversations);
 
@@ -104,6 +109,19 @@ export function useConversations(now: () => number = Date.now): ConversationsApi
     });
   }, []);
 
+  const appendStream = useCallback((id: string, text: string) => {
+    setStreams((prev) => new Map(prev).set(id, (prev.get(id) ?? "") + text));
+  }, []);
+
+  const clearStream = useCallback((id: string) => {
+    setStreams((prev) => {
+      if (!prev.has(id)) return prev;
+      const copy = new Map(prev);
+      copy.delete(id);
+      return copy;
+    });
+  }, []);
+
   return {
     conversations,
     activeId,
@@ -116,5 +134,8 @@ export function useConversations(now: () => number = Date.now): ConversationsApi
     setPending,
     stepsOf: (id) => steps.get(id),
     setSteps,
+    streamOf: (id) => streams.get(id),
+    appendStream,
+    clearStream,
   };
 }

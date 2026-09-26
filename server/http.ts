@@ -8,7 +8,7 @@ export interface RequestContext {
   path: string;
 }
 
-const BASE_HEADERS: Record<string, string> = {
+export const BASE_HEADERS: Record<string, string> = {
   "Content-Type": "application/json; charset=utf-8",
   "Cache-Control": "no-store",
   "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'",
@@ -86,4 +86,35 @@ export function parseCookies(header: string | null): Record<string, string> {
     cookies[part.slice(0, eq).trim()] = part.slice(eq + 1).trim();
   }
   return cookies;
+}
+
+/**
+ * Newline-delimited JSON stream. `run` gets a `send` that writes one event per
+ * line; the stream closes when `run` settles. Writes after a client disconnect
+ * are dropped rather than thrown.
+ */
+export function ndjsonStream(requestId: string, run: (send: (event: object) => void) => Promise<void>): Response {
+  const encoder = new TextEncoder();
+  const body = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      let open = true;
+      const send = (event: object) => {
+        if (!open) return;
+        try {
+          controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
+        } catch {
+          open = false;
+        }
+      };
+      try {
+        await run(send);
+      } finally {
+        if (open) controller.close();
+      }
+    },
+  });
+  return new Response(body, {
+    status: 200,
+    headers: { ...BASE_HEADERS, "Content-Type": "application/x-ndjson; charset=utf-8", "X-Accel-Buffering": "no", "X-Request-Id": requestId },
+  });
 }
