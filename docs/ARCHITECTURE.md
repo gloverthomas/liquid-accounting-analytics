@@ -13,11 +13,11 @@ server/app.ts          (Request, ctx) → Response   ← all routing, auth, limi
 ## A chat turn (`POST /api/v1/insights/chat`)
 
 1. **Validate:** JSON only, at most 64 KB, a message of 2 to 2,000 characters, a known `orgId`, and history cut to the last 6 turns (1,500 characters each).
-2. **Plan** (`retrieval/router.ts`): rules only, no extra model call. The question is classified by intent (`issue_status`, `ci_health`, `trend`, `merged_prs`, `linear_overview` or `general`), and the planner picks out ticket IDs, a time window (default 14 days, max 30), repos and keywords.
+2. **Plan** (`retrieval/router.ts`): rules only, no extra model call. The question is classified by intent (`issue_status`, `ci_health`, `trend`, `problems`, `merged_prs`, `linear_overview`, `insights_usage`, `workflow_plan`, `evals`, `pipeline` or `general`), and the planner picks out ticket IDs, a time window (default 14 days, max 30), repos and keywords.
 3. **Fetch in parallel** (`retrieval/index.ts`). Each connector runs `live` if its key is set, otherwise `sample` (the default), or reports `unavailable`. A configured connector that fails reports `unavailable` and **never** falls back to sample data.
 4. **Normalise** each item into a citable block that starts with its ID, e.g. `[linear:LIQ-24]`, `[github:PR:owner/repo#5]` or `[github:check:owner/repo@sha7:name]`. Text is redacted and clipped along the way.
 5. **Rank and pack** (`retrieval/rank.ts`). Scoring favours exact ticket-ID matches, then items that fit the intent, keyword overlap and recency. Items are packed in rank order into a hard **12,000-character** budget; a partly included item keeps its leading `[id]`.
-6. **Ask Grok** (`grok/client.ts`) with temperature 0.2, up to 900 tokens, a 12-second timeout and JSON mode (retried without JSON mode on a 400 or 422).
+6. **Ask Grok** (`grok/client.ts`) with temperature 0.2, up to 1,500 tokens, a 12-second timeout and JSON mode (retried without JSON mode on a 400 or 422).
 7. **Validate the answer** (`grok/parseResponse.ts`). Invalid JSON gets one repair attempt. Citation IDs that weren't retrieved are removed from both the list and the answer text, and sources are numbered in the order they first appear.
 8. **Fallbacks** (`insights.ts`):
    - When every connector was in sample mode and the canned answer's sources were all retrieved, a canned answer is used (`provider: "fixture"`).
