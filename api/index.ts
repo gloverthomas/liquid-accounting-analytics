@@ -4,10 +4,12 @@
  * exact same handler as the local BFF.
  */
 import { randomUUID } from "node:crypto";
+import { waitUntil } from "@vercel/functions";
 import { createApp } from "../server/app.js";
 import { loadConfig } from "../server/config.js";
 
-const app = createApp({ config: loadConfig() });
+// waitUntil keeps Slack answers running after the 200 that Slack needs within 3 seconds.
+const app = createApp({ config: loadConfig(), waitUntil });
 
 function resolvePath(url: URL): string {
   const rewritten = url.searchParams.get("__path");

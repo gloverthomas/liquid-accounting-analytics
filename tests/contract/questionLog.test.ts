@@ -26,7 +26,7 @@ describe("question log writes", () => {
     expect(body.api_key).toBe(TOKEN);
     expect(body.distinct_id).toMatch(/^insights-[0-9a-f]{16}$/);
     expect(Object.keys(body.properties).sort()).toEqual(
-      ["$process_person_profile", "answer_type", "app", "chart_count", "chart_kinds", "citation_count", "latency_ms", "outcome", "sources", "style", "topic", "window_days"].sort(),
+      ["$process_person_profile", "answer_type", "app", "channel", "chart_count", "chart_kinds", "citation_count", "latency_ms", "outcome", "sources", "style", "topic", "window_days"].sort(),
     );
     const raw = String(ingest.init!.body);
     for (const leak of ["pricing", "ACME", "jane@acme.test", "unreleased"]) expect(raw).not.toContain(leak);

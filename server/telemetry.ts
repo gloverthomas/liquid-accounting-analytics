@@ -18,6 +18,7 @@ export function ingestHost(host: string): string {
 }
 
 export type QuestionOutcome = "answered" | "fallback" | "error";
+export type QuestionChannel = "web" | "slack";
 
 export interface QuestionRecord {
   topic: string;
@@ -29,6 +30,7 @@ export interface QuestionRecord {
   latencyMs: number;
   citationCount: number;
   windowDays: number;
+  channel?: QuestionChannel;
 }
 
 /** Anonymous, stable per signed-in session; lets PostHog count viewers without identifying anyone. */
@@ -49,6 +51,7 @@ export function questionEventProperties(record: QuestionRecord): Record<string, 
     latency_ms: Math.round(record.latencyMs),
     citation_count: record.citationCount,
     window_days: record.windowDays,
+    channel: record.channel ?? "web",
     // Don't create person profiles for anonymous viewers.
     $process_person_profile: false,
   };

@@ -10,7 +10,7 @@ import type { InsightAnswer } from "../insights.js";
 import { logEvent } from "../log.js";
 import { approveImplement } from "../retrieval/workflow.js";
 import type { FetchLike } from "../retrieval/types.js";
-import { ActionError, answer, citationFor, fetchIssue, inTeam, moveIssue } from "./linearTransition.js";
+import { ActionError, answer, citationFor, fetchIssue, inTeam, moveIssue, WEB_CONFIRMATION } from "./linearTransition.js";
 import { createActionToken, verifyActionToken } from "./token.js";
 
 /** The state liquid-workflow's IMPLEMENT_STATES listens for. */
@@ -20,6 +20,7 @@ const READY_STATES = new Set(["In Progress", "Todo"]);
 interface Deps {
   fetch: FetchLike;
   now?: () => number;
+  confirmedVia?: string;
 }
 
 function ready(config: Config): { writeKey: string; secret: string; workflowToken: string } | null {
@@ -64,7 +65,7 @@ export async function executeImplement(token: unknown, config: Config, deps: Dep
   }
 
   // 1) Human approval, recorded by the workflow's write-gate (actor: liquid-insights).
-  const approval = await approveImplement(issueId, "Approved in Liquid Insights (confirmed in the app).", {
+  const approval = await approveImplement(issueId, `Approved ${deps.confirmedVia ?? WEB_CONFIRMATION}.`, {
     baseUrl: config.workflow.baseUrl,
     token: keys.workflowToken,
     fetch: deps.fetch,
@@ -74,7 +75,7 @@ export async function executeImplement(token: unknown, config: Config, deps: Dep
 
   // 2) In Review → the workflow's Linear webhook starts the implement run.
   const fromState = issue.state.name;
-  await moveIssue(issue, IMPLEMENT_STATE, keys.writeKey, deps.fetch, `Cursor plan **approved** and moved from **${fromState}** to **${IMPLEMENT_STATE}** from Liquid Insights (confirmed in the app). The workflow will start implementation after its eval and CI gates.`);
+  await moveIssue(issue, IMPLEMENT_STATE, keys.writeKey, deps.fetch, `Cursor plan **approved** and moved from **${fromState}** to **${IMPLEMENT_STATE}** ${deps.confirmedVia ?? WEB_CONFIRMATION}. The workflow will start implementation after its eval and CI gates.`);
   logEvent("workflow_implement_requested", { status: `${issueId}:${fromState}->${IMPLEMENT_STATE}` });
 
   return answer(

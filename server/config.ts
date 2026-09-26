@@ -25,6 +25,11 @@ export interface Config {
   sentry: { token: string | null; org: string; host: string; environment: string };
   /** liquid-workflow control plane (Cursor SDK plans/evals). Token is server-side only. */
   workflow: { baseUrl: string; token: string | null };
+  /**
+   * Slack bot. botToken (xoxb-) + signingSecret switch it on; approverIds are the
+   * Slack user IDs allowed to press Approve / Move buttons (empty = no buttons).
+   */
+  slack: { botToken: string | null; signingSecret: string | null; approverIds: string[]; publicUrl: string };
 }
 
 type Env = Record<string, string | undefined>;
@@ -144,6 +149,15 @@ export function loadConfig(env: Env = process.env): Config {
     workflow: {
       baseUrl: parseWorkflowUrl(str(env, "WORKFLOW_BASE_URL"), isProductionLike),
       token: atLeast(str(env, "WORKFLOW_API_TOKEN"), 24),
+    },
+    slack: {
+      botToken: /^xoxb-[A-Za-z0-9-]{20,}$/.test(str(env, "SLACK_BOT_TOKEN") ?? "") ? str(env, "SLACK_BOT_TOKEN") : null,
+      signingSecret: atLeast(str(env, "SLACK_SIGNING_SECRET"), 16),
+      approverIds: (str(env, "SLACK_APPROVER_IDS") ?? "")
+        .split(",")
+        .map((id) => id.trim())
+        .filter((id) => /^[UW][A-Z0-9]{6,}$/.test(id)),
+      publicUrl: /^https:\/\/[\w.-]+$/.test(str(env, "INSIGHTS_PUBLIC_URL") ?? "") ? str(env, "INSIGHTS_PUBLIC_URL")! : "https://insights.liquid-accounting.world",
     },
     sentry: {
       token: str(env, "SENTRY_AUTH_TOKEN"),

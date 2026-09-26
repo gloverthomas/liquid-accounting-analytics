@@ -37,6 +37,7 @@ With no keys it runs in **sample mode**: realistic LIQ-24 demo data and canned a
 | `SENTRY_AUTH_TOKEN` / `SENTRY_ORG` / `SENTRY_HOST` | Production errors | Read-only User Auth Token; production issues only, no stack traces |
 | `POSTHOG_PROJECT_TOKEN` | Insights question log | Public `phc_` token; categories only, never question text |
 | `LINEAR_ACTIONS_API_KEY` | Ticket moves | A **separate** Linear key with write access; without it the app stays read-only |
+| `SLACK_BOT_TOKEN` / `SLACK_SIGNING_SECRET` / `SLACK_APPROVER_IDS` | Slack bot | See [Slack](#slack); approver IDs gate the Approve / Move buttons |
 | `WORKFLOW_BASE_URL` / `WORKFLOW_API_TOKEN` | Cursor plans, evals, pipeline, Approve & implement | liquid-workflow's `WORKFLOW_API_TOKEN` (≥24 chars); URL must be `https://*.liquid-accounting.world` (loopback allowed in dev) |
 
 The full list is in [`.env.example`](.env.example). If a key is set but that service fails, the answer marks it "unavailable" rather than quietly switching to sample data.
@@ -114,6 +115,23 @@ Insights reads the [liquid-workflow](https://github.com/gloverthomas/liquid-work
 **Approve & implement** works like a ticket move: a signed 5-minute token of its own kind (it can't be replayed as a plain move, or vice versa). Confirming records the human approval with the workflow (`POST /approve`, actor `liquid-insights`) and then moves the ticket to **In Review**, which the workflow's Linear webhook treats as "implement". The workflow still enforces its own eval, CI and write gates, and PRs still need a human to merge. It needs `LINEAR_ACTIONS_API_KEY` and `WORKFLOW_API_TOKEN`.
 
 If the service is down (it runs on a Mac behind a Cloudflare tunnel), answers say so instead of guessing.
+
+## Slack
+
+Mention **@Liquid Insights** in a channel (or DM it) and it answers in the thread, using the same pipeline, sources and citation checks as the web app. The answer streams into the message as Grok writes it.
+
+- **Threads have memory:** follow-ups in the same thread include the earlier turns.
+- **Charts** can't render in Slack, so each one becomes a one-line summary with a link to the web app. The pipeline tracker becomes a checklist.
+- **Follow-up buttons** ask that question in the thread.
+- **Approve & implement / Move to In Progress** use the same signed 5-minute confirmations as the web app. They appear as buttons with a confirm dialog, work only for Slack users listed in `SLACK_APPROVER_IDS`, and the Linear audit comment names who confirmed from Slack. With no approvers set, Slack links to the web app instead.
+- **Security:** every Slack request is verified with the signing secret (and refused if it's more than 5 minutes old). The routes don't use the access-code session. Slack retries and duplicate events are ignored. The question log records only the topic and `channel: slack`.
+
+**Setup (about 5 minutes):**
+
+1. Go to <https://api.slack.com/apps> → **Create New App** → **From a manifest**, pick the workspace, and paste [`docs/slack-app-manifest.json`](docs/slack-app-manifest.json).
+2. **Install to Workspace**. Copy the **Bot User OAuth Token** (`xoxb-…`) and, from Basic Information, the **Signing Secret**.
+3. Add `SLACK_BOT_TOKEN`, `SLACK_SIGNING_SECRET` and `SLACK_APPROVER_IDS` (your Slack member ID: profile → ⋯ → Copy member ID) to Vercel and redeploy.
+4. In Slack's Event Subscriptions page, click **Retry** next to the request URL if it shows as unverified. Then `/invite @Liquid Insights` to a channel.
 
 ## Security posture
 

@@ -45,7 +45,11 @@ export interface IssueNode {
 export interface ActionDeps {
   fetch: FetchLike;
   now?: () => number;
+  /** Who/where confirmed, for the audit comment. Defaults to the web app. */
+  confirmedVia?: string;
 }
+
+export const WEB_CONFIRMATION = "from Liquid Insights (confirmed in the app)";
 
 /** Rule-based: a move verb plus a ticket id or a state name. */
 export function detectTicketAction(message: string): TicketActionIntent | null {
@@ -184,7 +188,7 @@ export async function executeTransition(token: unknown, config: Config, deps: Ac
     return answer(`**${issueId} was already ${toState}**, so nothing changed. [linear:${issueId}]`, [citationFor(issue)], [`What's the status of ${issueId}?`]);
   }
 
-  await moveIssue(issue, toState, writeKey, deps.fetch, `Moved from **${fromState}** to **${toState}** from Liquid Insights (confirmed in the app).`);
+  await moveIssue(issue, toState, writeKey, deps.fetch, `Moved from **${fromState}** to **${toState}** ${deps.confirmedVia ?? WEB_CONFIRMATION}.`);
   logEvent("linear_transition", { status: `${issueId}:${fromState}->${toState}` });
 
   return answer(

@@ -2,19 +2,17 @@
  * Framework-free BFF: `(Request, ctx) → Response`. The local Node server and the
  * Vercel function are thin adapters around this, so both enforce identical rules.
  */
-import { HISTORY_MAX_TURNS, MESSAGE_MAX_CHARS, MESSAGE_MIN_CHARS, type ChatResponse, type ChatStreamEvent, type ChatTurn } from "../shared/contracts.js";
+import { MESSAGE_MAX_CHARS, MESSAGE_MIN_CHARS, type ChatStreamEvent, type ChatTurn } from "../shared/contracts.js";
 import { ActionError, executeTransition } from "./actions/linearTransition.js";
 import { executeImplement } from "./actions/workflowImplement.js";
 import { accessCodeMatches, authenticate, buildSessionCookie, createSessionToken, sessionCookieName } from "./auth.js";
 import { sessionAuthEnabled, type Config } from "./config.js";
 import { createXaiClient, type GrokClient } from "./grok/client.js";
 import { BodyError, errorResponse, json, ndjsonStream, noContent, parseCookies, readJsonBody, type RequestContext } from "./http.js";
-import { answerQuestion } from "./insights.js";
+import { runChatTurn, sanitizeHistory } from "./chatTurn.js";
+import { createSlackHandlers } from "./slack/handler.js";
 import { progressSteps } from "./progress.js";
-import { detectTicketAction } from "./actions/linearTransition.js";
-import { planRetrieval } from "./retrieval/router.js";
-import { anonymousViewerId, recordQuestion, type QuestionRecord } from "./telemetry.js";
-import { isHelpQuestion } from "../shared/askCatalog.js";
+import { anonymousViewerId } from "./telemetry.js";
 import { errorCode, logEvent } from "./log.js";
 import { ORGS, DEFAULT_ORG, SUGGESTED_PROMPTS } from "./org.js";
 import { RATE_LIMITS, RateLimiter } from "./rateLimit.js";
@@ -27,20 +25,13 @@ export interface AppDeps {
   grok?: GrokClient | null;
   limiter?: RateLimiter;
   now?: () => number;
+  /** Keeps background work (Slack answers) alive after the response; Vercel passes its waitUntil. */
+  waitUntil?: (work: Promise<unknown>) => void;
 }
 
 export type AppHandler = (request: Request, ctx: RequestContext) => Promise<Response>;
 
 const SERVICE = "liquid-accounting-analytics-bff";
-const HISTORY_TURN_MAX_CHARS = 1_500;
-
-function sanitizeHistory(value: unknown): ChatTurn[] {
-  if (!Array.isArray(value)) return [];
-  return value
-    .filter((turn): turn is ChatTurn => Boolean(turn) && (turn.role === "user" || turn.role === "assistant") && typeof turn.content === "string")
-    .map((turn) => ({ role: turn.role, content: turn.content.slice(0, HISTORY_TURN_MAX_CHARS) }))
-    .slice(-HISTORY_MAX_TURNS);
-}
 
 function originAllowed(request: Request, config: Config): boolean {
   const origin = request.headers.get("origin");
@@ -68,6 +59,7 @@ function connectorFlags(config: Config) {
     questionLog: Boolean(config.posthog.projectToken),
     workflow: Boolean(config.workflow.token),
     sentry: Boolean(config.sentry.token),
+    slack: Boolean(config.slack.botToken && config.slack.signingSecret),
     fixtures: config.allowFixtures,
     actions: Boolean(config.actions.linearApiKey),
   };
@@ -104,57 +96,13 @@ export function createApp(deps: AppDeps): AppHandler {
     return { message, history: sanitizeHistory(body.history) };
   }
 
-  /** Answers, records the question-log event and logs. Throws (after recording) on failure. */
-  async function runChat(
-    { message, history }: ChatInput,
-    request: Request,
-    ctx: RequestContext,
-    onReplyDelta?: (text: string) => void,
-  ): Promise<Omit<ChatResponse, "requestId">> {
-    const started = now();
-    const action = detectTicketAction(message);
-    const help = isHelpQuestion(message);
-    const plan = planRetrieval(message, config.github.repos);
-    const record = (answer: Omit<QuestionRecord, "topic" | "style" | "charts" | "windowDays">): Promise<void> =>
-      recordQuestion(config, fetchImpl, viewerIdFor(request, config), {
-        topic: action ? "ticket_move" : help ? "help" : plan.intent,
-        style: action ? "action" : help ? "direct" : plan.style,
-        charts: action || help ? [] : plan.charts,
-        windowDays: plan.sinceDays,
-        ...answer,
-      });
-
-    let answer: Awaited<ReturnType<typeof answerQuestion>>;
-    try {
-      answer = await answerQuestion(message, history, config, { fetch: fetchImpl, grok, now, requestId: ctx.requestId, onReplyDelta });
-    } catch (error) {
-      await record({ sources: [], answerType: "none", outcome: "error", latencyMs: now() - started, citationCount: 0 });
-      throw error;
-    }
-    const latencyMs = now() - started;
-    const answerType = answer.provider.startsWith("grok:") ? "grok" : (answer.provider as "fixture" | "digest" | "action");
-    await record({
-      sources: Object.entries(answer.retrievalMeta.connectorModes)
-        .filter(([, mode]) => mode !== "unavailable")
-        .map(([c]) => c),
-      answerType,
-      outcome: answerType === "digest" && !help ? "fallback" : "answered",
-      latencyMs,
-      citationCount: answer.citations.length,
-    });
-    logEvent("insights_chat", {
-      requestId: ctx.requestId,
-      provider: answer.provider,
-      connectors: answer.retrievalMeta.connectors,
-      connectorModes: answer.retrievalMeta.connectorModes,
-      itemCount: answer.retrievalMeta.itemCount,
-      truncated: answer.retrievalMeta.truncated,
-      messageLength: message.length,
-      latencyMs,
-      streamed: Boolean(onReplyDelta),
-    });
-    return { ...answer, latencyMs };
-  }
+  const turnDeps = { config, fetch: fetchImpl, grok, now };
+  const slack =
+    config.slack.botToken && config.slack.signingSecret
+      ? createSlackHandlers({ ...turnDeps, waitUntil: deps.waitUntil ?? ((work) => void work.catch(() => undefined)) })
+      : null;
+  const runChat = (input: ChatInput, request: Request, ctx: RequestContext, onReplyDelta?: (text: string) => void) =>
+    runChatTurn({ ...input, viewerId: viewerIdFor(request, config), channel: "web", requestId: ctx.requestId, onReplyDelta }, turnDeps);
 
   async function handleChat(request: Request, ctx: RequestContext): Promise<Response> {
     const input = await readChat(request, ctx);
@@ -215,6 +163,12 @@ export function createApp(deps: AppDeps): AppHandler {
       return json(200, ctx.requestId, { status: "ok", service: SERVICE, grok: grok ? "grok" : "fixture", connectors: connectorFlags(config) });
     }
     if (path === "/api/v1/session" && (method === "POST" || method === "DELETE")) return handleSession(request, ctx);
+    // Slack calls these directly; they're authenticated by Slack's request signature, not a session.
+    if (path === "/api/v1/slack/events" || path === "/api/v1/slack/interactions") {
+      if (!slack) return errorResponse(404, ctx.requestId, "not_found");
+      if (method !== "POST") return errorResponse(405, ctx.requestId, "method_not_allowed");
+      return path.endsWith("events") ? slack.events(request, ctx.requestId) : slack.interactions(request, ctx.requestId);
+    }
 
     const auth = authenticate(request, config);
     if (!auth.ok) {
