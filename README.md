@@ -113,6 +113,14 @@ Ask "How does the human write gate work?", "Why did we build a deterministic eva
 - **Open security work:** open security-related PRs are included on the **web only**. In Slack, the bot says those are only discussed in the web app.
 - **Better answers come from better docs:** add or update a decision record in `docs/decisions/` and Insights picks it up within 10 minutes of merging.
 
+## Engineering handbook (in Linear)
+
+`docs/handbook/` (start here, system map, agent workflow, security overview, runbooks, tooling, glossary) and every repo's `docs/decisions/` are published as documents on the **Liquid accounting** team in Linear:
+
+- `npm run handbook:publish` shows what would change; `npm run handbook:publish -- --apply` writes. The **Publish handbook to Linear** GitHub Action does this on docs changes and daily; it needs the `LINEAR_ACTIONS_API_KEY` repo secret.
+- **GitHub is the source of truth.** Each Linear copy starts with a "📌 Published from GitHub" banner linking to its source, so edit there. Links between published pages point at their Linear copies.
+- **It only ever creates or updates its own documents**, never deletes (docs whose source disappeared are reported as orphans). Insights skips the Linear copies, so each doc is searched once.
+
 ## Cursor workflow: plans, evals, pipeline
 
 Insights reads the [liquid-workflow](https://github.com/gloverthomas/liquid-workflow) service (Cursor SDK plan → eval → approval → implement):

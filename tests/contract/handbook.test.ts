@@ -20,6 +20,10 @@ describe("links and banners", () => {
   it("round-trips the banner's source and hash, and ignores docs without one", () => {
     expect(parseBanner(`${banner(WF, "docs/decisions/0001-a.md", "abcdef0123")}\n\nbody`)).toEqual({ url: sourceUrl(WF, "docs/decisions/0001-a.md"), hash: "abcdef0123" });
     expect(parseBanner("A doc the team wrote in Linear")).toBeNull();
+    // As Linear stores it after saving: links wrapped in angle brackets.
+    const stored = banner(WF, "docs/decisions/0001-a.md", "abcdef0123").replace(/\]\((https:[^)]+)\)/, "](<$1>)");
+    expect(stored).toContain("](<https://");
+    expect(parseBanner(stored)).toEqual({ url: sourceUrl(WF, "docs/decisions/0001-a.md"), hash: "abcdef0123" });
   });
 
   it("hashes content so unchanged docs aren't rewritten", () => {

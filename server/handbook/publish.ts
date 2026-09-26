@@ -57,7 +57,8 @@ export function banner(repo: string, path: string, contentHash: string): string 
   return `> ${PUBLISHED_MARKER} [${repo.split("/")[1]}/${path}](${sourceUrl(repo, path)}). Edit it there; changes sync here automatically. · sync ${contentHash}`;
 }
 
-const BANNER_SOURCE = /📌 Published from GitHub: \[[^\]]*\]\((https:\/\/github\.com\/[^)]+)\)/;
+// Linear stores links as `[text](<url>)`, so the angle brackets are optional.
+const BANNER_SOURCE = /📌 Published from GitHub: \[[^\]]*\]\(<?(https:\/\/github\.com\/[^)>\s]+)>?\)/;
 const BANNER_HASH = /· sync ([0-9a-f]{10})/;
 
 export function parseBanner(content: string | null): { url: string; hash: string | null } | null {
@@ -116,7 +117,8 @@ async function markdownFiles(repo: string, dir: string, deps: GithubDeps): Promi
 /** Titles and order: handbook "NN · Title" first (0–99), then decisions grouped by repo (100+). */
 export async function collectSources(deps: GithubDeps): Promise<PublishSource[]> {
   const toSource = (repo: string, path: string, text: string, title: (h1: string) => string, sortOrder: number): PublishSource => {
-    const h1 = splitMarkdown(text).title || posix.basename(path, ".md");
+    // Titles are plain text in Linear, so drop Markdown code ticks.
+    const h1 = (splitMarkdown(text).title || posix.basename(path, ".md")).replace(/`/g, "");
     const body = text.replace(/^#\s+.*\n?/m, "");
     return { repo, path, title: title(h1), body, sortOrder };
   };
