@@ -12,7 +12,7 @@
 | --- | --- | --- |
 | Handbook **00–06** | [liquid-accounting-analytics/docs/handbook/](https://github.com/gloverthomas/liquid-accounting-analytics/tree/main/docs/handbook) on GitHub | **Automatic** — GitHub→Linear sync |
 | Repo **decision records** | Each repo `docs/decisions/*.md` | **Automatic** — “Decision · …” pages |
-| Handbook **07–21** (SDK, eval, PR stack, **interview prep**) | GitHub `docs/handbook/` + Project store `docs/handbook/` | **Manual in the same change** — Linear doc via UI or MCP `save_document` |
+| Handbook **07–27** (SDK, eval, PR stack, **interview prep**) | GitHub `docs/handbook/` + Project store `docs/handbook/` | **Manual in the same change** — Linear doc via UI or MCP `save_document` |
 | **liquid-workflow** runtime copy | [liquid-workflow](https://github.com/gloverthomas/liquid-workflow) | **Manual** — Linear **07** / **08** / **09** + handbook markdown |
 | Demo / prod facts | `docs/live-demo-talk-track.md`, product docs | **Manual** — any Linear section Insights cites |
 
@@ -49,6 +49,12 @@ Cloud agents: handbook/workflow doc work is **incomplete** without Linear (excep
 | [19 · Session arc](https://linear.app/liquid-accounting/document/19-interview-prep-45-minute-session-arc-ff4bbb70e624) | `19-interview-session-arc.md` |
 | [20 · Q&A catalog](https://linear.app/liquid-accounting/document/20-interview-prep-qanda-catalog-quick-reference-61c3e71eadda) | `20-interview-qa-catalog.md` |
 | [21 · Two-repo story](https://linear.app/liquid-accounting/document/21-interview-prep-two-repo-convergence-story-2d1c943c6e00) | `21-interview-two-repo-convergence.md` |
+| [22 · SDK codebase map](https://linear.app/liquid-accounting/document/22-interview-prep-sdk-in-the-codebase-where-to-look-17cc55ba90a1) | `22-interview-sdk-codebase-map.md` |
+| [23 · Retro rebuild](https://linear.app/liquid-accounting/document/23-interview-prep-retro-if-we-built-this-again-a1a0df7a4b7b) | `23-interview-retro-rebuild.md` |
+| [24 · Harness improvements](https://linear.app/liquid-accounting/document/24-interview-prep-improving-this-cursor-sdk-linear-eval-harness-58917d3c525e) | `24-interview-workflow-harness-improvements.md` |
+| [25 · Tooling SoT](https://linear.app/liquid-accounting/document/25-interview-prep-tooling-source-of-truth-vs-notification-vs-execution-36bbd0a06822) | `25-interview-tooling-source-of-truth.md` |
+| [26 · Insights democratization](https://linear.app/liquid-accounting/document/26-interview-prep-democratizing-liquid-insights-access-guardrails-9f0e114ebe1c) | `26-interview-insights-democratization.md` |
+| [27 · Official email brief](https://linear.app/liquid-accounting/document/27-interview-prep-official-exercise-brief-sdk-grok-live-repo-walk-cc97a48fac59) | `27-interview-official-email-brief.md` |
 
 Full interview index for Tom: [linear-interview-knowledge-index.md](../linear-interview-knowledge-index.md) (Project store).
 

@@ -25,6 +25,30 @@ Linear **In Progress** → plan + eval. **In Review** (after formal approve + ev
 
 ---
 
+## Interview prep cross-links
+
+For the official **open the repo → trigger → output** exercise, treat **`liquid-workflow`** as the SDK home — not Core/Reporting product repos and not Liquid Insights.
+
+**How to find the SDK in the repo (narrative walk):**
+
+1. **Start at the call site:** `src/sdk-planner.ts` — `import { Agent } from "@cursor/sdk"`; `startPlanRun` / `startImplementRun` wrap `Agent.create()` (plan ~plan mode + no PR; implement ~agent mode + `autoCreatePR`).
+2. **Follow the HTTP entry:** `src/server.ts` registers routes; **`src/linear-webhook.ts`** maps Linear **In Progress** → plan and **In Review** → implement (after gates). Manual demos use **`POST /trigger`** (plan) and **`POST /implement`** with bearer auth from **`src/access.ts`**.
+3. **Hero-specific prompt text:** `src/prompts/liq-24.ts` (and siblings) — selected by `isLiq24()` et al. in `sdk-planner.ts`; do not grep product apps for `@cursor/sdk`.
+4. **Env that must exist on the workflow host:** `CURSOR_API_KEY`, optional per-role `CURSOR_MODEL_*`, gate flags in **`src/config.ts`** (`EVAL_GATE`, `CI_GATE`, `WORKFLOW_ENABLED`, `REQUIRE_FORMAL_APPROVAL`, `APPROVE_TOKEN`). Product apps use loopback BFF secrets — never `VITE_*` for privileged keys.
+
+**Handbook drill-down (manual sync — same session as Linear):**
+
+| Doc | Use when interviewer asks… |
+| --- | --- |
+| [10 · SDK vs alternatives](https://linear.app/liquid-accounting/document/10-interview-prep-sdk-vs-skills-api-mcp-b038d0f2c221) | Why SDK/API vs skill/MCP-only |
+| [11 · SDK boundaries](https://linear.app/liquid-accounting/document/11-interview-prep-sdk-boundaries-starts-and-stops-4f31fcd000d9) | Where SDK starts/stops; `/signal` is not SDK |
+| [22 · Codebase map](https://linear.app/liquid-accounting/document/22-interview-prep-sdk-in-the-codebase-where-to-look-17cc55ba90a1) | File/line anchors, route table, module map |
+| [27 · Official brief](https://linear.app/liquid-accounting/document/27-interview-prep-official-exercise-brief-sdk-grok-live-repo-walk-cc97a48fac59) | Email constraints + live walk script |
+
+Eval and merge policy sound bites live in [08 · Eval rubric](https://linear.app/liquid-accounting/document/08-deterministic-eval-rubric-reference-53c129d9cb9a) and [14 · Evals & merge](https://linear.app/liquid-accounting/document/14-interview-prep-evals-merge-policy-and-gates-9e3f786bb7ae) — this doc keeps **verbatim prompts** only.
+
+---
+
 ## Runtime substitutions (before verbatim blocks)
 
 Parent prompts are template strings built in TypeScript. At send time the harness replaces:
