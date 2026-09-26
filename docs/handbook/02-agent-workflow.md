@@ -6,7 +6,7 @@ How a ticket goes from "something's broken" to merged, and exactly where humans 
 
 | Step | Who | Happens in | What happens |
 | --- | --- | --- | --- |
-| 1. Signal | App or person | Reporting / Linear | A broken surface POSTs `/signal`, or someone files a ticket → **Todo**. Triage only: no agent work yet. |
+| 1. Signal | App or person | Linear (or `POST /signal`) | Someone files a ticket, or an app calls liquid-workflow's `/signal` → **Todo**. Triage only: no agent work yet. (No app calls `/signal` today; the demo defects that did were fixed on 26 Sep 2026.) |
 | 2. Plan | Person moves ticket → **In Progress** | Linear → liquid-workflow | The Cursor SDK planner reads both repos, spawns read-only security and quality reviewers, and writes a plan. |
 | 3. Eval | Automatic | liquid-workflow | A deterministic rubric scores the plan (names files and tests, states scope and the human gate, no big-bang). Results at `/evals`. |
 | 4. Approve | **Person** | Insights "Approve & implement", Slack, Linear `/approve`, or `POST /approve` | Records a formal approval (valid 24 h). Insights also moves the ticket to In Review. |

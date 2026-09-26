@@ -14,7 +14,7 @@ Set `WORKFLOW_ENABLED=false` in the workflow's `.env.local` and restart. Finer s
 
 ## A ticket moved to Done unexpectedly
 
-A merged PR mentioned it: the GitHub webhook moves every `LIQ-N` in a merged PR's title, description or branch. Move it back in Linear, and keep unrelated ids out of PR descriptions.
+A merged PR mentioned it: the GitHub webhook moves the **first** `LIQ-N` it finds in a merged PR's title, description or branch name. Move it back in Linear, and keep unrelated ids out of PR descriptions.
 
 ## Insights says "Not set up yet" or every API call returns 503
 

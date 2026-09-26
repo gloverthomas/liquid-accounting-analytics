@@ -1,8 +1,8 @@
 # Glossary
 
 - **BFF** — "backend for frontend": each app's small server that holds secrets and serves `/api`.
-- **Hero tickets** — the Linear tickets the workflow is set up to act on (e.g. LIQ-9, LIQ-15, LIQ-16, LIQ-17, LIQ-24).
-- **Signal** — a broken surface in Reporting POSTing `/signal`, which files a Todo for triage. It never starts agent work.
+- **Hero tickets** — visible Core ⇄ Reporting gaps used to demo the workflow (LIQ-5 to LIQ-9, LIQ-15 to LIQ-17, LIQ-24). All fixed or closed as of 26 Sep 2026; new demo defects get new tickets.
+- **Signal** — an app calling liquid-workflow's `POST /signal`, which files a Todo for triage. It never starts agent work. No app calls it today.
 - **Plan / implement run** — a Cursor SDK run that writes a plan (In Progress) or opens PRs (In Review, after approval).
 - **Eval / eval gate** — the deterministic rubric that scores a plan; implementation is blocked until it passes.
 - **Human write gate** — the rule that agents open PRs only, and humans approve, merge and deploy. Also the name of the most-failed eval check.

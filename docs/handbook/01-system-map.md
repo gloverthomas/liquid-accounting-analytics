@@ -14,7 +14,7 @@ How Core, Reporting, Insights and liquid-workflow connect, and which external se
      web app + Slack bot                      │
                                               ▼
    Core (liquid-accounting.world)   Reporting (reporting.liquid-accounting.world)
-     each with its own BFF            broken surfaces POST /signal ─▶ liquid-workflow (triage only)
+     each with its own BFF            (POST /signal ─▶ liquid-workflow files a triage ticket)
 ```
 
 ## Each system
