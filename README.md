@@ -142,6 +142,10 @@ Mention **@Liquid Insights** in a channel (or DM it) and it answers in the threa
 3. Add `SLACK_BOT_TOKEN`, `SLACK_SIGNING_SECRET` and `SLACK_APPROVER_IDS` (your Slack member ID: profile → ⋯ → Copy member ID) to Vercel and redeploy.
 4. In Slack's Event Subscriptions page, click **Retry** next to the request URL if it shows as unverified. Then `/invite @Liquid Insights` to a channel.
 
+## Why it works this way
+
+Decision records live in [`docs/decisions/`](docs/decisions/README.md): retrieval vs tool calling, enforced citations, confirm-gated actions, auth, the question log, Slack, streaming and web/Slack parity.
+
 ## Security posture
 
 - API keys stay on the server. There is no `VITE_`-prefixed secret, and the browser only talks to its own origin.
