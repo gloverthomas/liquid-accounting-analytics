@@ -28,6 +28,7 @@ export const DOC_PATHS: Array<{ repo: string; path: string; dir?: boolean }> = [
   { repo: INSIGHTS, path: "docs/ARCHITECTURE.md" },
   { repo: INSIGHTS, path: "docs/CONNECTORS.md" },
   { repo: INSIGHTS, path: "docs/decisions", dir: true },
+  { repo: INSIGHTS, path: "docs/handbook", dir: true },
   { repo: CORE, path: "README.md" },
   { repo: CORE, path: "docs/decisions", dir: true },
   { repo: REPORTING, path: "README.md" },
@@ -46,8 +47,11 @@ export const CODE_HEADER_PATHS: Array<{ repo: string; path: string }> = [
   { repo: INSIGHTS, path: "server/telemetry.ts" },
 ];
 
-/** Mirror copies of repo docs published to Linear carry this marker and are skipped (the repo is the source). */
-export const PUBLISHED_MARKER = "<!-- published-from-github -->";
+/**
+ * Copies of repo docs published to Linear start with this (visible) line and are
+ * skipped, so each doc is only searched once, from its source.
+ */
+export const PUBLISHED_MARKER = "📌 Published from GitHub:";
 
 export interface DocSection {
   id: string;
