@@ -51,7 +51,15 @@ export const ASK_CATALOG: AskTopic[] = [
     title: "How it works & why",
     blurb: "Onboarding and triage: the workflow, tooling, security, and the decisions behind them.",
     sources: "Docs · decision records · PRs",
-    examples: ["How does the human write gate work?", "Why did we build a deterministic eval harness?", "How is the workflow API secured?", "I'm new, where do I start?"],
+    examples: [
+      "How does the human write gate work?",
+      "Why did we build a deterministic eval harness?",
+      "How is the workflow API secured?",
+      "Why not a Cursor skill instead of liquid-workflow?",
+      "How does Reporting POST /signal relate to starting a SDK plan run?",
+      "Is the eval harness an MCP?",
+      "I'm new, where do I start?",
+    ],
   },
   {
     id: "actions",

@@ -107,7 +107,20 @@ describe("loadDocCorpus", () => {
     const { fetch } = fakeSources({
       linearDocs: [
         { slugId: "abc123", title: "On-call runbook", url: "https://linear.app/doc/abc123", content: "## Paging\nPage the owner.", updatedAt: "2026-09-20T00:00:00Z" },
-        { slugId: "mirror1", title: "0003 mirror", url: "https://linear.app/doc/mirror1", content: `${PUBLISHED_MARKER}\n## Decision\nCopy.`, updatedAt: "2026-09-20T00:00:00Z" },
+        {
+          slugId: "mirror1",
+          title: "0003 mirror",
+          url: "https://linear.app/doc/mirror1",
+          content: `${PUBLISHED_MARKER} [liquid-accounting-analytics/docs/handbook/00-start-here.md](https://github.com/gloverthomas/liquid-accounting-analytics/blob/main/docs/handbook/00-start-here.md). Edit it there; changes sync here automatically. · sync abcdef1234\n## Decision\nCopy.`,
+          updatedAt: "2026-09-20T00:00:00Z",
+        },
+        {
+          slugId: "manual1",
+          title: "11 interview",
+          url: "https://linear.app/doc/manual1",
+          content: `${PUBLISHED_MARKER} liquid-accounting-analytics/docs/handbook/11.md · manual sync\n## SDK stops\nHumans merge.`,
+          updatedAt: "2026-09-20T00:00:00Z",
+        },
       ],
     });
     const corpus = await loadDocCorpus({ githubToken: "gh", linearApiKey: "lin", fetch });
@@ -117,6 +130,7 @@ describe("loadDocCorpus", () => {
     expect(ids).toContain("docs:liquid-workflow/src/access.ts");
     expect(ids).toContain("docs:linear/abc123#paging");
     expect(ids.some((id) => id.includes("mirror1") || id.includes("notes.txt"))).toBe(false);
+    expect(ids).toContain("docs:linear/manual1#sdk-stops");
     const decision = corpus.find((s) => s.id.endsWith("#decision"))!;
     expect(decision).toMatchObject({ isDecision: true, url: "https://github.com/gloverthomas/liquid-workflow/blob/main/docs/decisions/0003-deterministic-eval-harness.md#decision" });
   });
