@@ -203,13 +203,17 @@ async function linearDocs(deps: DocsDeps): Promise<DocSection[]> {
   const res = await deps.fetch("https://api.linear.app/graphql", {
     method: "POST",
     headers: { Authorization: deps.linearApiKey, "Content-Type": "application/json" },
-    body: JSON.stringify({ query: "{ documents(first: 50, orderBy: updatedAt) { nodes { slugId title url content updatedAt } } }" }),
+    body: JSON.stringify({ query: "{ documents(first: 250, orderBy: updatedAt) { nodes { slugId title url content updatedAt } } }" }),
     signal: AbortSignal.timeout(CONNECTOR_TIMEOUT_MS),
   });
   if (!res.ok) throw new Error(`linear_docs_${res.status}`);
   const body = (await res.json()) as { data?: { documents?: { nodes: LinearDocument[] } } };
+  /** Skip GitHub→Linear auto-sync mirrors (hash in banner); keep manual-sync handbook pages. */
+  const isAutoSyncedGithubMirror = (content: string) =>
+    content.includes(PUBLISHED_MARKER) && /· sync [0-9a-f]{10}/.test(content.slice(0, 600));
+
   return (body.data?.documents?.nodes ?? [])
-    .filter((d) => d.content && !d.content.includes(PUBLISHED_MARKER))
+    .filter((d) => d.content && !isAutoSyncedGithubMirror(d.content))
     .flatMap((d) =>
       splitMarkdown(`# ${d.title}\n${d.content}`).sections.map(({ heading, body: text }) => ({
         id: `docs:linear/${d.slugId}${heading ? `#${slugify(heading)}` : ""}`,

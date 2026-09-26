@@ -50,17 +50,22 @@ const META_USAGE = [
   /\b(using|use|usage of|used)\b[^.?]*\b(insights|this (tool|bot|app|chat))\b/i,
   /\b(insights|this (tool|bot|app|chat))\b[^.?]*\b(usage|used|adoption)\b/i,
 ];
-/** Cursor SDK workflow questions (liquid-workflow). */
+/** Cursor SDK workflow questions (liquid-workflow) — live plan/eval for a ticket, not handbook "why plan vs signal". */
 const WORKFLOW_PLAN = [
-  /\b(cursor|agent|sdk|workflow)\b[^.?]*\bplan(s|ned|ning)?\b/i,
   /\bplan(s|ned)?\b[^.?]*\b(for|to fix)\b[^.?]*\b[A-Z][A-Z0-9]{1,5}-\d{1,6}\b/i,
   /\bwhat (does|will|would|is) (cursor|the agent)\b[^.?]*\b(plan|propose|fix|change|do)\b/i,
+  /\b(cursor|agent|sdk|workflow)\b[^.?]*\bplan(s|ned|ning)?\b[^.?]*\b(for|to fix|LIQ-\d+)\b/i,
 ];
 const EVAL_WORDS = /\b(evals?|evaluations?|eval (gate|harness|checks?|pass rate)|write[- ]gate|gates?)\b/i;
 /** Onboarding / "how does it work / why did we" questions, answered from docs and decision records. */
 const EXPLAIN = [
-  /\bhow (does|do|should|would|is|are|can) (?!.*\b(tracking|going|doing)\b)[\w\s'./-]{2,80}?\b(work|works|working|set ?up|configured|secured|protected|verified|authenticated|handled|deployed|hosted|built|triggered|approved|gated|run|runs|fit together|connect|stored)\b/i,
-  /\bwhy (did|do|does|is|are|was|were|have|has|don'?t|doesn'?t|can'?t|isn'?t) (we|the|our|it|this|they|agents?|insights|cursor|liquid)\b/i,
+  /\bhow (does|do|should|would|is|are|can) (?!.*\b(tracking|going|doing)\b)[\w\s'./-]{2,80}?\b(work|works|working|set ?up|configured|secured|protected|verified|authenticated|handled|deployed|hosted|built|triggered|approved|gated|run|runs|fit together|connect|stored|start|relate)\b/i,
+  /\bwhy (did|do|does|is|are|was|were|have|has|don'?t|doesn'?t|can'?t|isn'?t|not|should|can)\b/i,
+  /\bwhy not\b/i,
+  /\b(is|are) (the |our )?(eval harness|eval gate|deterministic eval|write[- ]gate|human write gate)\b/i,
+  /\b(is|are) (the |our )?(eval harness|eval gate)\b[^.?]*\b(mcp|llm)\b/i,
+  /\b(does|do|can)\b[^.?]{0,120}\b(signal|\/signal)\b[^.?]{0,120}\b(plan|implement|sdk|agent)\b/i,
+  /\b(cursor skill|skills instead|liquid-workflow vs|sdk vs|grok vs|two repo|shared bff|mcp)\b/i,
   /\b(explain|walk me through|onboard(ing)?|i'?m new|new (here|to the team|to this)|where (do|should) i start|getting started|decision records?|adrs?|design decisions?|architecture|security model|threat model|write policy|kill switch(es)?)\b/i,
   /\bwhat('s| is| are) (our|the) (approach|policy|process|rationale|reasoning|security|design|guardrails?)\b/i,
 ];

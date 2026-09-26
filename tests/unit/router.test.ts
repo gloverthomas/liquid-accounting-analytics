@@ -58,6 +58,16 @@ describe("planRetrieval", () => {
     expect(plan.keywords).not.toContain("issues");
   });
 
+  it("routes interview handbook questions to how_it_works, not workflow_plan", () => {
+    const signal =
+      "Why does Reporting POST /signal create a Linear Todo but not start a Cursor SDK plan run?";
+    expect(planRetrieval(signal, REPOS).intent).toBe("how_it_works");
+    expect(planRetrieval("Why not just a Cursor skill in each repo instead of liquid-workflow?", REPOS).intent).toBe("how_it_works");
+    expect(planRetrieval("Is the eval harness an MCP?", REPOS).intent).toBe("how_it_works");
+    expect(planRetrieval("How does Reporting POST /signal relate to starting a plan run?", REPOS).intent).toBe("how_it_works");
+    expect(planRetrieval("What's the Cursor plan for LIQ-24?", REPOS).intent).toBe("workflow_plan");
+  });
+
   it("chooses overview style for summaries and direct style for specific questions", () => {
     expect(planRetrieval("Give me an overview of what's been happening", REPOS).style).toBe("overview");
     expect(planRetrieval("Catch me up on Reporting", REPOS).style).toBe("overview");
