@@ -7,6 +7,8 @@ import type { ChartSpec, ChatTurn, Citation, PipelineTimeline, ProposedAction, P
 import { ASK_CATALOG, isHelpQuestion } from "../shared/askCatalog.js";
 import { proposeImplement } from "./actions/workflowImplement.js";
 import { runWorkflowQuestion } from "./workflowQuestions.js";
+import { runDocsQuestion } from "./docsQuestions.js";
+import type { QuestionChannel } from "./telemetry.js";
 import { detectTicketAction, proposeTransition } from "./actions/linearTransition.js";
 import type { Config } from "./config.js";
 import { fixtureAnswerFor } from "./fixtures/responses.js";
@@ -33,6 +35,8 @@ export interface InsightAnswer {
 export interface InsightDeps extends RetrievalDeps {
   grok: GrokClient | null;
   requestId?: string;
+  /** Where the question came from; decides what's safe to include (e.g. open security work is web-only). */
+  channel?: QuestionChannel;
   /** Streaming only: receives the answer text as Grok writes it (before validation). */
   onReplyDelta?: (text: string) => void;
 }
@@ -132,7 +136,8 @@ export async function answerQuestion(message: string, history: ChatTurn[], confi
   const plan = planRetrieval(message, config.github.repos);
   const workflowIntent = WORKFLOW_INTENTS.has(plan.intent);
   const workflow = workflowIntent ? await runWorkflowQuestion(plan, config, deps.fetch, (deps.now ?? Date.now)()) : null;
-  const { context, items, meta, charts } = workflow ?? (await runRetrieval(plan, config, deps));
+  const docs = plan.intent === "how_it_works" ? await runDocsQuestion(message, config, deps.fetch, deps.channel ?? "web", deps.cache) : null;
+  const { context, items, meta, charts } = workflow ?? (docs ? { ...docs, charts: [] } : await runRetrieval(plan, config, deps));
   // Plan answers offer "Approve & implement" when the plan's eval passed (still confirm-gated).
   const proposal = workflow?.plan?.evalPassed ? await proposeImplement(workflow.plan.issueId, config, deps).catch(() => null) : null;
   const chartPart = {
@@ -142,15 +147,27 @@ export async function answerQuestion(message: string, history: ChatTurn[], confi
   };
 
   // Workflow questions with nothing to cite (service down / no runs) say why, rather than "found nothing".
+  const docsNoData =
+    docs && !items.length
+      ? {
+          reply: context.startsWith("DOCS UNAVAILABLE")
+            ? "**I couldn't read the docs right now.** Try again in a minute."
+            : "**I couldn't find docs that cover that.** Try naming the area (e.g. the write gate, eval harness, Slack approvals, the workflow API), or if it isn't written down yet, add a decision record in `docs/decisions/`.",
+          citations: [],
+          relatedQuestions: ["How does the human write gate work?", "Why did we build a deterministic eval harness?", "How is the workflow API secured?"],
+          provider: "digest" as const,
+        }
+      : null;
   const workflowNoData =
-    workflowIntent && !items.length
+    docsNoData ??
+    (workflowIntent && !items.length
       ? {
           reply: `**${context.replace(/^\[workflow:none\]\s*|^WORKFLOW SERVICE UNAVAILABLE:\s*/, "").split(/(?<=\.)\s/)[0]}**\n\n${context.includes("UNAVAILABLE") ? "Start it with `NODE_ENV=development npm start` in liquid-workflow, then ask again." : ""}`.trim(),
           citations: [],
           relatedQuestions: ["How are our evals tracking?", "Which tickets are still in progress?", "Move LIQ-17 to In Progress"],
           provider: "digest" as const,
         }
-      : null;
+      : null);
 
   if (deps.grok && items.length) {
     try {

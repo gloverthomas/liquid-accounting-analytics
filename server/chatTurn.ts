@@ -60,7 +60,7 @@ export async function runChatTurn(input: ChatTurnInput, deps: ChatTurnDeps): Pro
 
   let answer: Awaited<ReturnType<typeof answerQuestion>>;
   try {
-    answer = await answerQuestion(message, history, config, { fetch, grok, now, requestId, onReplyDelta });
+    answer = await answerQuestion(message, history, config, { fetch, grok, now, requestId, onReplyDelta, channel });
   } catch (error) {
     await record({ sources: [], answerType: "none", outcome: "error", latencyMs: now() - started, citationCount: 0 });
     throw error;

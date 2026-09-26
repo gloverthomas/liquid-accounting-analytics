@@ -40,6 +40,14 @@ export function progressSteps(message: string, config: Config): string[] {
   const plan = planRetrieval(message, config.github.repos);
   const grokStep = config.xai.apiKey ? "Asking Grok to write it up…" : "Putting the answer together…";
   const id = plan.issueIds[0];
+  if (plan.intent === "how_it_works") {
+    return [
+      "Reading the docs and decision records across the four repos…",
+      "Checking Linear docs and merged PRs for the reasoning…",
+      "Ranking the most relevant sections…",
+      config.xai.apiKey ? "Asking Grok to explain it…" : "Putting the answer together…",
+    ];
+  }
   if (plan.intent === "workflow_plan") {
     return [
       `Finding the latest Cursor plan run${id ? ` for ${id}` : ""} in liquid-workflow…`,

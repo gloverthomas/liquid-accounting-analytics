@@ -59,7 +59,8 @@ export function detectTicketAction(message: string): TicketActionIntent | null {
   const toMatch = message.match(/\bto\s+(in[\s-]?progress|in[\s-]?review|to[\s-]?do|backlog|done|cancell?ed)\b/i);
   const phrase = toMatch?.[1] ?? message;
   const mentioned = STATES.find(([pattern]) => pattern.test(phrase))?.[1] ?? null;
-  const targetState = mentioned ?? (/\b(start|kick off)\b/i.test(message) ? "In Progress" : null);
+  // "Start LIQ-17" implies In Progress; a bare "start" ("where do I start?") is not a request to move anything.
+  const targetState = mentioned ?? (issueIds.length && /\b(start|kick off)\b/i.test(message) ? "In Progress" : null);
   if (!issueIds.length && !targetState) return null;
   return { issueIds, targetState };
 }

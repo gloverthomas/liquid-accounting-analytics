@@ -14,6 +14,7 @@ export const CACHE_TTL_MS = {
   githubPrs: 120_000,
   githubSearch: 120_000,
   githubChecks: 180_000,
+  docs: 600_000,
 } as const;
 
 const MAX_ENTRIES = 200;

@@ -3,9 +3,9 @@
  * the browser and server can never drift on field names.
  */
 
-export type ConnectorId = "linear" | "github" | "posthog" | "sentry" | "github_search" | "workflow";
+export type ConnectorId = "linear" | "github" | "posthog" | "sentry" | "github_search" | "workflow" | "docs";
 
-export type CitationKind = "linear_issue" | "github_pr" | "github_check" | "posthog_insight" | "sentry_issue" | "workflow_run";
+export type CitationKind = "linear_issue" | "github_pr" | "github_check" | "posthog_insight" | "sentry_issue" | "workflow_run" | "doc";
 
 export interface Citation {
   /** Stable retrieval id, e.g. `linear:LIQ-24` or `github:PR:owner/repo#10`. */

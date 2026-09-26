@@ -21,6 +21,7 @@ const INTENT_BOOST: Record<Intent, Partial<Record<Kind, number>>> = {
   workflow_plan: { workflow_run: 60, linear_issue: 10 },
   evals: { workflow_run: 40 },
   pipeline: { workflow_run: 30, linear_issue: 30, github_pr: 20 },
+  how_it_works: { doc: 40, github_pr: 5 },
   general: {},
 };
 

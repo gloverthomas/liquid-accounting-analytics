@@ -4,6 +4,7 @@
  * become numbered footnote links to the Sources list.
  */
 import type { ReactNode } from "react";
+import { CITATION_TOKEN_SOURCE } from "../../shared/citations";
 import { parseBlocks } from "../lib/markdown";
 
 interface AnswerMarkdownProps {
@@ -14,7 +15,8 @@ interface AnswerMarkdownProps {
   anchorPrefix: string;
 }
 
-const INLINE = /(\*\*[^*]+\*\*|`[^`]+`|_[^_\s][^_]*_|\[(?:linear|github|posthog|sentry|workflow):[^\]\s]+\])/g;
+// Bold, code, italic, or a citation token (non-capturing, so split() keeps whole tokens).
+const INLINE = new RegExp(`(\\*\\*[^*]+\\*\\*|\`[^\`]+\`|_[^_\\s][^_]*_|${CITATION_TOKEN_SOURCE.replace("(", "(?:")})`, "g");
 
 function renderInline(text: string, props: AnswerMarkdownProps, key: string): ReactNode[] {
   return text.split(INLINE).map((part, i) => {

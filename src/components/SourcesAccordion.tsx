@@ -1,7 +1,7 @@
 import { ChevronRight } from "lucide-react";
 import type { ChatResponse } from "../../shared/contracts";
 
-const CONNECTOR_NAMES: Record<string, string> = { linear: "Linear", github: "GitHub", posthog: "PostHog", sentry: "Sentry" };
+const CONNECTOR_NAMES: Record<string, string> = { linear: "Linear", github: "GitHub", posthog: "PostHog", sentry: "Sentry", workflow: "Cursor workflow", docs: "Docs" };
 
 function providerLabel(provider: ChatResponse["provider"]): string {
   if (provider === "fixture") return "Sample answer (Grok not used)";

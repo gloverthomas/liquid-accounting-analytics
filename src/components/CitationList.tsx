@@ -1,4 +1,4 @@
-import { Bot, Bug, CircleCheck, CircleDot, GitPullRequest, LineChart, Ticket } from "lucide-react";
+import { BookOpen, Bot, Bug, CircleCheck, CircleDot, GitPullRequest, LineChart, Ticket } from "lucide-react";
 import type { Citation } from "../../shared/contracts";
 import { statusTone } from "../lib/status";
 
@@ -14,6 +14,7 @@ const KIND_ICON = {
   posthog_insight: LineChart,
   sentry_issue: Bug,
   workflow_run: Bot,
+  doc: BookOpen,
 } as const;
 
 const KIND_LABEL = {
@@ -23,6 +24,7 @@ const KIND_LABEL = {
   posthog_insight: "PostHog",
   sentry_issue: "Sentry",
   workflow_run: "Cursor workflow",
+  doc: "Docs",
 } as const;
 
 /** Only http(s) links are rendered as links; anything else is shown as plain text. */

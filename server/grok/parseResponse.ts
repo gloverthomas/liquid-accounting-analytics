@@ -1,3 +1,4 @@
+import { citationTokenRegex } from "../../shared/citations.js";
 /**
  * Validates Grok's JSON and enforces the citation contract: only ids that were
  * actually retrieved survive, both in the citations list and inline in the reply.
@@ -12,8 +13,6 @@ export interface ParsedGrokAnswer {
 const MAX_REPLY_CHARS = 6_000;
 const MAX_QUESTION_CHARS = 160;
 const MAX_RELATED = 3;
-/** Anything that looks like one of our citation tokens, e.g. [linear:LIQ-24]. */
-export const CITATION_TOKEN = /\[((?:linear|github|posthog|sentry):[^\]\s]+)\]/g;
 
 function extractJsonObject(raw: string): unknown {
   const cleaned = raw
@@ -54,12 +53,13 @@ export function parseGrokResponse(raw: string, knownIds: ReadonlySet<string>): P
   // Drop hallucinated inline tokens; keep known ones for the UI to render as source links.
   const inlineIds: string[] = [];
   const reply = rawReply
-    .replace(CITATION_TOKEN, (token, id: string) => {
+    .replace(citationTokenRegex(), (token, id: string) => {
       if (!knownIds.has(id)) return "";
       inlineIds.push(id);
       return token;
     })
     .replace(/[ \t]{2,}/g, " ")
+    .replace(/[ \t]+$/gm, "")
     .slice(0, MAX_REPLY_CHARS);
 
   const listed = (Array.isArray(record.citations) ? record.citations : []).map(asId).filter((id): id is string => Boolean(id && knownIds.has(id)));

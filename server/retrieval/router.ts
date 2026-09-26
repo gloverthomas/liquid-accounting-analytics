@@ -3,13 +3,13 @@
  * hit, for which repos, over what window.
  */
 
-export type Intent = "workflow_plan" | "evals" | "pipeline" | "insights_usage" | "issue_status" | "ci_health" | "trend" | "problems" | "merged_prs" | "linear_overview" | "general";
+export type Intent = "how_it_works" | "workflow_plan" | "evals" | "pipeline" | "insights_usage" | "issue_status" | "ci_health" | "trend" | "problems" | "merged_prs" | "linear_overview" | "general";
 
 /** Server-computed charts a question can ask for. */
 export type ChartKind = "prs_per_day" | "tickets_by_state" | "opened_vs_closed" | "ci_history" | "usage_trend" | "bff_health" | "assistant_usage" | "insights_topics" | "insights_daily" | "sentry_errors" | "evals_daily" | "eval_checks";
 
 /** "overview" = narrative summary + key items; "direct" = short answer to a specific question. */
-export type AnswerStyle = "overview" | "direct" | "plan" | "pipeline";
+export type AnswerStyle = "overview" | "direct" | "plan" | "pipeline" | "explain";
 
 export interface RetrievalPlan {
   intent: Intent;
@@ -57,6 +57,15 @@ const WORKFLOW_PLAN = [
   /\bwhat (does|will|would|is) (cursor|the agent)\b[^.?]*\b(plan|propose|fix|change|do)\b/i,
 ];
 const EVAL_WORDS = /\b(evals?|evaluations?|eval (gate|harness|checks?|pass rate)|write[- ]gate|gates?)\b/i;
+/** Onboarding / "how does it work / why did we" questions, answered from docs and decision records. */
+const EXPLAIN = [
+  /\bhow (does|do|should|would|is|are|can) (?!.*\b(tracking|going|doing)\b)[\w\s'./-]{2,80}?\b(work|works|working|set ?up|configured|secured|protected|verified|authenticated|handled|deployed|hosted|built|triggered|approved|gated|run|runs|fit together|connect|stored)\b/i,
+  /\bwhy (did|do|does|is|are|was|were|have|has|don'?t|doesn'?t|can'?t|isn'?t) (we|the|our|it|this|they|agents?|insights|cursor|liquid)\b/i,
+  /\b(explain|walk me through|onboard(ing)?|i'?m new|new (here|to the team|to this)|where (do|should) i start|getting started|decision records?|adrs?|design decisions?|architecture|security model|threat model|write policy|kill switch(es)?)\b/i,
+  /\bwhat('s| is| are) (our|the) (approach|policy|process|rationale|reasoning|security|design|guardrails?)\b/i,
+];
+const NOT_EXPLAIN = /\bhow (many|often|much)\b|\btracking\b|\bthis week\b|\blast \d+ (days?|weeks?)\b/i;
+
 const PIPELINE_WORDS = /\b(pipeline|timeline|journey|where is|how far (along|through)|progress of|stage|lifecycle)\b/i;
 
 export const isInsightsUsageQuestion = (message: string) => META_USAGE.some((re) => re.test(message));
@@ -142,6 +151,8 @@ function extractKeywords(lower: string): string[] {
 
 function classify(message: string, hasIssueIds: boolean, namesStates: boolean): Intent {
   if (isInsightsUsageQuestion(message)) return "insights_usage";
+  // Before the workflow intents: "how does the eval gate work?" is about the design, not today's numbers.
+  if (!hasIssueIds && !NOT_EXPLAIN.test(message) && EXPLAIN.some((re) => re.test(message))) return "how_it_works";
   if (WORKFLOW_PLAN.some((re) => re.test(message))) return "workflow_plan";
   if (EVAL_WORDS.test(message)) return "evals";
   if (hasIssueIds && PIPELINE_WORDS.test(message)) return "pipeline";
@@ -173,7 +184,9 @@ export function planRetrieval(message: string, configuredRepos: string[]): Retri
     wantsPosthog: intent === "insights_usage" || intent === "trend" || PRODUCT_WORDS.test(message) || BFF_WORDS.test(message),
     keywords: extractKeywords(lower),
     style:
-      intent === "workflow_plan"
+      intent === "how_it_works"
+        ? "explain"
+        : intent === "workflow_plan"
         ? "plan"
         : intent === "pipeline"
           ? "pipeline"

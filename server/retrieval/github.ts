@@ -69,6 +69,18 @@ export async function searchPullsMentioning(ids: string[], repos: string[], deps
   }));
 }
 
+/** Free-text PR search (e.g. rationale for a design, or open security work). `query` is GitHub search syntax without scope. */
+export async function searchPulls(query: string, repos: string[], deps: GithubDeps, perPage = 4): Promise<Array<{ repo: string; pull: GithubPull }>> {
+  if (!repos.length) return [];
+  const scope = repos.map((repo) => `repo:${repo}`).join(" ");
+  const q = encodeURIComponent(`${query} is:pr ${scope}`);
+  const body = await getJson<{ items: GithubPull[] }>(`/search/issues?q=${q}&per_page=${perPage}`, deps);
+  return body.items.map((pull) => ({
+    repo: pull.repository_url?.split("/repos/")[1] ?? repos[0],
+    pull: { ...pull, merged_at: pull.merged_at ?? pull.pull_request?.merged_at ?? null },
+  }));
+}
+
 export async function fetchCheckRuns(repo: string, ref: string, deps: GithubDeps): Promise<GithubCheckRun[]> {
   const body = await getJson<{ check_runs: GithubCheckRun[] }>(
     `/repos/${repo}/commits/${encodeURIComponent(ref)}/check-runs?per_page=${CHECKS_PAGE_SIZE}`,

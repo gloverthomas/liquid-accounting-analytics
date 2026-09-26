@@ -22,7 +22,7 @@ export type QuestionChannel = "web" | "slack";
 
 export interface QuestionRecord {
   topic: string;
-  style: "overview" | "direct" | "plan" | "pipeline" | "action";
+  style: "overview" | "direct" | "plan" | "pipeline" | "explain" | "action";
   charts: string[];
   sources: string[];
   answerType: "grok" | "fixture" | "digest" | "action" | "none";

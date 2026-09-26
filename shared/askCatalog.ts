@@ -47,6 +47,13 @@ export const ASK_CATALOG: AskTopic[] = [
     examples: ["What's the Cursor plan for LIQ-24?", "How are our evals tracking?", "Where is LIQ-24 in the pipeline?"],
   },
   {
+    id: "how",
+    title: "How it works & why",
+    blurb: "Onboarding and triage: the workflow, tooling, security, and the decisions behind them.",
+    sources: "Docs · decision records · PRs",
+    examples: ["How does the human write gate work?", "Why did we build a deterministic eval harness?", "How is the workflow API secured?", "I'm new, where do I start?"],
+  },
+  {
     id: "actions",
     title: "Actions (you confirm)",
     blurb: "Kick off work. Nothing changes until you click Confirm.",

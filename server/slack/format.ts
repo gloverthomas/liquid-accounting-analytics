@@ -6,6 +6,7 @@
  */
 import type { ChartSpec, Citation, PipelineTimeline, ProposedAction, TimelineStep } from "../../shared/contracts.js";
 import type { InsightAnswer } from "../insights.js";
+import { citationTokenRegex } from "../../shared/citations.js";
 
 export const ACTION_IDS = { approve: "insights_approve", cancel: "insights_cancel", ask: "insights_ask" } as const;
 export const PROPOSAL_BLOCK_ID = "insights_proposal";
@@ -28,7 +29,7 @@ export interface SlackRendered {
 
 const escape = (text: string) => text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 const clip = (text: string, max: number) => (text.length > max ? `${text.slice(0, max - 1)}…` : text);
-const CITATION = /\[((?:linear|github|posthog|sentry|workflow):[^\]\s]+)\]/g;
+const CITATION = citationTokenRegex();
 
 /** Markdown (as Grok writes it) → Slack mrkdwn. Citations become <url|[n]> when known, else disappear. */
 export function toMrkdwn(markdown: string, citations: Citation[] = []): string {

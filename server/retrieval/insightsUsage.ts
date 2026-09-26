@@ -26,6 +26,7 @@ export const TOPIC_LABELS: Record<string, string> = {
   evals: "Eval tracking",
   pipeline: "Pipeline tracker",
   help: "What can I ask?",
+  how_it_works: "How it works",
 };
 
 export interface QuestionRow {

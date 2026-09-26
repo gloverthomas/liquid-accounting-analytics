@@ -104,6 +104,15 @@ It is limited to `LIQUID_ACTIONS_ALLOWED_STATES` (default: In Progress), to the 
 
 Under the prompt pills on the home screen, **What can I ask?** opens every topic Insights covers (tickets, PRs & CI, problems & errors, product analytics, the Cursor workflow, actions, and Insights itself), each with example questions that ask on click. Typing "What can I ask?" or "help" in the chat gives the same list as an answer (no Grok call). The examples live in `shared/askCatalog.ts`, and a test checks that each one routes to a specific intent.
 
+## How it works & why (onboarding)
+
+Ask "How does the human write gate work?", "Why did we build a deterministic eval harness?", "How is the workflow API secured?" or "I'm new, where do I start?" (web or Slack).
+
+- **Sources:** an allowlist of docs from all four repos' `main` (READMEs, WRITE-POLICY, ARCHITECTURE/CONNECTORS and every `docs/decisions/*.md`), plus the design comment at the top of a few key source files (`access.ts`, `guardrails.ts`, the action and Slack handlers) and Linear Documents. Merged PRs are searched for rationale. Nothing outside the allowlist is read. Docs are cached for 10 minutes.
+- **Answers** lead with the answer, then What / Why / Where it lives / How to change it safely / Gotchas / Security, citing doc sections as links to GitHub. If no decision record explains a "why", the answer says the reasoning isn't written down rather than guessing.
+- **Open security work:** open security-related PRs are included on the **web only**. In Slack, the bot says those are only discussed in the web app.
+- **Better answers come from better docs:** add or update a decision record in `docs/decisions/` and Insights picks it up within 10 minutes of merging.
+
 ## Cursor workflow: plans, evals, pipeline
 
 Insights reads the [liquid-workflow](https://github.com/gloverthomas/liquid-workflow) service (Cursor SDK plan → eval → approval → implement):
