@@ -36,7 +36,7 @@ describe("BFF routes", () => {
     const app = devApp();
     expect(await (await app(get("/api/v1/organisation"), ctx("/api/v1/organisation"))).json()).toMatchObject({ id: "org_liquid_coffee", name: "Liquid Coffee Co." });
     expect((await (await app(get("/api/v1/orgs"), ctx("/api/v1/orgs"))).json()).orgs).toHaveLength(1);
-    expect((await (await app(get("/api/v1/suggested-prompts"), ctx("/api/v1/suggested-prompts"))).json()).prompts[0].label).toBe("Open LIQ-24 status");
+    expect((await (await app(get("/api/v1/suggested-prompts"), ctx("/api/v1/suggested-prompts"))).json()).prompts[0].label).toBe("Where New chat lives");
     expect((await app(get("/api/v1/connectors/status"), ctx("/api/v1/connectors/status"))).status).toBe(200);
     expect((await app(get("/api/v1/nope"), ctx("/api/v1/nope"))).status).toBe(404);
     expect((await app(postJson("/api/v1/orgs", {}), ctx("/api/v1/orgs"))).status).toBe(405);

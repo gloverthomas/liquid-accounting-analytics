@@ -12,7 +12,7 @@
 | --- | --- | --- |
 | Handbook **00–06** | [liquid-accounting-analytics/docs/handbook/](https://github.com/gloverthomas/liquid-accounting-analytics/tree/main/docs/handbook) on GitHub | **Automatic** — GitHub→Linear sync |
 | Repo **decision records** | Each repo `docs/decisions/*.md` | **Automatic** — “Decision · …” pages |
-| Handbook **07–27** (SDK, eval, PR stack, **interview prep**) | GitHub `docs/handbook/` + Project store `docs/handbook/` | **Manual in the same change** — Linear doc via UI or MCP `save_document` |
+| Handbook **07–28** (SDK, eval, PR stack, **interview prep**) | GitHub `docs/handbook/` + Project store `docs/handbook/` | **Manual in the same change** — Linear doc via UI or MCP `save_document` |
 | **liquid-workflow** runtime copy | [liquid-workflow](https://github.com/gloverthomas/liquid-workflow) | **Manual** — Linear **07** / **08** / **09** + handbook markdown |
 | Demo / prod facts | `docs/live-demo-talk-track.md`, product docs | **Manual** — any Linear section Insights cites |
 
@@ -55,6 +55,7 @@ Cloud agents: handbook/workflow doc work is **incomplete** without Linear (excep
 | [25 · Tooling SoT](https://linear.app/liquid-accounting/document/25-interview-prep-tooling-source-of-truth-vs-notification-vs-execution-36bbd0a06822) | `25-interview-tooling-source-of-truth.md` |
 | [26 · Insights democratization](https://linear.app/liquid-accounting/document/26-interview-prep-democratizing-liquid-insights-access-guardrails-9f0e114ebe1c) | `26-interview-insights-democratization.md` |
 | [27 · Official email brief](https://linear.app/liquid-accounting/document/27-interview-prep-official-exercise-brief-sdk-grok-live-repo-walk-cc97a48fac59) | `27-interview-official-email-brief.md` |
+| [28 · Codebase file walk](https://linear.app/liquid-accounting/document/28-codebase-file-walk-2acef5f9bbde) | `28-codebase-file-walk.md` |
 
 Full interview index for Tom: [linear-interview-knowledge-index.md](../linear-interview-knowledge-index.md) (Project store).
 

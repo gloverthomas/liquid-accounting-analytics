@@ -6,8 +6,9 @@ export const DEFAULT_ORG: Organisation = { id: "org_liquid_coffee", name: "Liqui
 export const ORGS: Organisation[] = [DEFAULT_ORG];
 
 export const SUGGESTED_PROMPTS: SuggestedPrompt[] = [
+  { id: "new-chat-file", label: "Where New chat lives", query: "Where does Reporting New chat live in the code?" },
+  { id: "signal-vs-plan", label: "Does /signal start the agent?", query: "Does the product signal start a Cursor SDK plan?" },
+  { id: "who-merges", label: "Who is allowed to merge?", query: "Who is allowed to merge?" },
+  { id: "grok-vs-sdk", label: "Grok or the SDK?", query: "Where does Grok run, and where does the Cursor SDK start?" },
   { id: "liq-24", label: "Open LIQ-24 status", query: "What's the status of LIQ-24 and are there PRs?" },
-  { id: "merged-per-day", label: "PRs merged per day this week", query: "How many PRs merged per day this week, Core vs Reporting?" },
-  { id: "ci-assistant-unit", label: "assistant-unit failures, last 2 weeks", query: "How often has assistant-unit failed over the last 2 weeks?" },
-  { id: "todo-vs-done", label: "Linear bugs in Todo vs Done", query: "How many Linear bugs are in Todo vs Done?" },
 ];

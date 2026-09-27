@@ -59,6 +59,12 @@ export const ASK_CATALOG: AskTopic[] = [
       "How does Reporting POST /signal relate to starting a SDK plan run?",
       "Is the eval harness an MCP?",
       "I'm new, where do I start?",
+      "Where does Reporting New chat live in the code?",
+      "Does the product signal start a Cursor SDK plan?",
+      "Who is allowed to merge?",
+      "What does BugBot do on an open PR?",
+      "Where do credentials live for the workflow?",
+      "Which models does the planner use, and who writes code?",
     ],
   },
   {

@@ -68,6 +68,11 @@ const EXPLAIN = [
   /\b(cursor skill|skills instead|liquid-workflow vs|sdk vs|grok vs|two repo|shared bff|mcp)\b/i,
   /\b(explain|walk me through|onboard(ing)?|i'?m new|new (here|to the team|to this)|where (do|should) i start|getting started|decision records?|adrs?|design decisions?|architecture|security model|threat model|write policy|kill switch(es)?)\b/i,
   /\bwhat('s| is| are) (our|the) (approach|policy|process|rationale|reasoning|security|design|guardrails?)\b/i,
+  /\b(which|what) file\b/i,
+  /\bwhere (does|do|is)\b[^.?]{0,80}\b(live|lives|file|code|function|handler|run|start)\b/i,
+  /\b(new chat|product signal|bugbot|feature map|autocreatepr|write[- ]gate|specialist reviewers?|composer-2\.5|files sidebar)\b/i,
+  /\b(who (merges|is allowed to merge|writes code)|what opens the pr|what starts the plan|what does bugbot do|which models)\b/i,
+  /\b(grok or the sdk|grok versus|cursor sdk start|credentials live|kill switches)\b/i,
 ];
 const NOT_EXPLAIN = /\bhow (many|often|much)\b|\btracking\b|\bthis week\b|\blast \d+ (days?|weeks?)\b/i;
 

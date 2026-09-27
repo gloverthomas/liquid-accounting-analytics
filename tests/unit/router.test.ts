@@ -66,6 +66,17 @@ describe("planRetrieval", () => {
     expect(planRetrieval("Is the eval harness an MCP?", REPOS).intent).toBe("how_it_works");
     expect(planRetrieval("How does Reporting POST /signal relate to starting a plan run?", REPOS).intent).toBe("how_it_works");
     expect(planRetrieval("What's the Cursor plan for LIQ-24?", REPOS).intent).toBe("workflow_plan");
+    for (const q of [
+      "Where does Reporting New chat live in the code?",
+      "Does the product signal start a Cursor SDK plan?",
+      "Who is allowed to merge?",
+      "What does BugBot do on an open PR?",
+      "Where do credentials live for the workflow?",
+      "Which file should I open for the write gate?",
+    ]) {
+      expect(planRetrieval(q, REPOS).intent, q).toBe("how_it_works");
+    }
+    expect(planRetrieval("How often has assistant-unit failed over the last 2 weeks?", REPOS).intent).toBe("ci_health");
   });
 
   it("chooses overview style for summaries and direct style for specific questions", () => {
