@@ -18,7 +18,7 @@ import { createReplyExtractor } from "./grok/replyStream.js";
 import { errorCode, logEvent } from "./log.js";
 import { ANSWER_STYLES, GROK_INSIGHTS_SYSTEM_PROMPT, REPAIR_INSTRUCTION } from "./prompts/system.js";
 import { runRetrieval, type RetrievalDeps } from "./retrieval/index.js";
-import { planRetrieval, type RetrievalPlan } from "./retrieval/router.js";
+import { normalizeQuestion, planRetrieval, type RetrievalPlan } from "./retrieval/router.js";
 import type { RetrievedItem } from "./retrieval/types.js";
 
 export interface InsightAnswer {
@@ -133,10 +133,11 @@ export async function answerQuestion(message: string, history: ChatTurn[], confi
   const action = detectTicketAction(message);
   if (action) return proposeTransition(action, config, deps);
 
-  const plan = planRetrieval(message, config.github.repos);
+  const asked = normalizeQuestion(message);
+  const plan = planRetrieval(asked, config.github.repos);
   const workflowIntent = WORKFLOW_INTENTS.has(plan.intent);
   const workflow = workflowIntent ? await runWorkflowQuestion(plan, config, deps.fetch, (deps.now ?? Date.now)()) : null;
-  const docs = plan.intent === "how_it_works" ? await runDocsQuestion(message, config, deps.fetch, deps.channel ?? "web", deps.cache) : null;
+  const docs = plan.intent === "how_it_works" ? await runDocsQuestion(asked, config, deps.fetch, deps.channel ?? "web", deps.cache) : null;
   const { context, items, meta, charts } = workflow ?? (docs ? { ...docs, charts: [] } : await runRetrieval(plan, config, deps));
   // Plan answers offer "Approve & implement" when the plan's eval passed (still confirm-gated).
   const proposal = workflow?.plan?.evalPassed ? await proposeImplement(workflow.plan.issueId, config, deps).catch(() => null) : null;

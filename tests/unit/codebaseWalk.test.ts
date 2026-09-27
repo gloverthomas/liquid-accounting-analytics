@@ -32,6 +32,11 @@ describe("codebase file walk ranking", () => {
       ["Where do credentials live for the workflow?", "Where do credentials live"],
       ["Is the eval harness an MCP?", "Is the eval an MCP"],
       ["Which models does the planner use, and who writes code?", "Which models and who writes code"],
+      ["How is the signal kick off the SDK workflow?", "How the signal kick off starts the SDK workflow"],
+      ["How is the sginal kick off the SDK workflow?", "How the signal kick off starts the SDK workflow"],
+      ["How does the Cursor SDK facilitate the workflow?", "How does the Cursor SDK facilitate the workflow"],
+      ["Does every engineer use their own Cursor key?", "Does every engineer use their own Cursor key"],
+      ["What would we need to do to ensure this is ready for enterprise?", "What would we need to be enterprise ready"],
     ];
     for (const [question, heading] of cases) {
       const top = rankSections(question, corpus, 3);

@@ -73,6 +73,14 @@ const EXPLAIN = [
   /\b(new chat|product signal|bugbot|feature map|autocreatepr|write[- ]gate|specialist reviewers?|composer-2\.5|files sidebar)\b/i,
   /\b(who (merges|is allowed to merge|writes code)|what opens the pr|what starts the plan|what does bugbot do|which models)\b/i,
   /\b(grok or the sdk|grok versus|cursor sdk start|credentials live|kill switches)\b/i,
+  /\bkick(?:s|ed|ing)?[- ]?off\b/i,
+  /\bhow (is|does|do)\b[^.?]{0,120}\b(signal|\/signal)\b/i,
+  /\bfacilitat/i,
+  /\b(cursor )?sdk\b[^.?]{0,80}\b(workflow|facilitat)\b/i,
+  /\bagent\.create\b/i,
+  /\b(own|personal|their) (cursor )?(api )?key\b/i,
+  /\bcursor (api )?key\b/i,
+  /\benterprise\b/i,
 ];
 const NOT_EXPLAIN = /\bhow (many|often|much)\b|\btracking\b|\bthis week\b|\blast \d+ (days?|weeks?)\b/i;
 
@@ -177,11 +185,17 @@ function classify(message: string, hasIssueIds: boolean, namesStates: boolean): 
   return "general";
 }
 
+/** Live questions often misspell the two product names. Retrieval should still hit the handbook. */
+export function normalizeQuestion(message: string): string {
+  return message.replace(/\bsginal\b/gi, "signal").replace(/\bgroq\b/gi, "Grok");
+}
+
 export function planRetrieval(message: string, configuredRepos: string[]): RetrievalPlan {
-  const lower = message.toLowerCase();
-  const issueIds = [...new Set([...message.matchAll(ISSUE_ID)].map((m) => m[1].toUpperCase()))].slice(0, MAX_ISSUE_IDS);
+  const asked = normalizeQuestion(message);
+  const lower = asked.toLowerCase();
+  const issueIds = [...new Set([...asked.matchAll(ISSUE_ID)].map((m) => m[1].toUpperCase()))].slice(0, MAX_ISSUE_IDS);
   const linearStates = STATE_WORDS.filter(([pattern]) => pattern.test(lower)).map(([, state]) => state);
-  const intent = classify(message, issueIds.length > 0, linearStates.length > 0);
+  const intent = classify(asked, issueIds.length > 0, linearStates.length > 0);
 
   return {
     intent,

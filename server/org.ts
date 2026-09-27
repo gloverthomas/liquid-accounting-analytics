@@ -10,5 +10,7 @@ export const SUGGESTED_PROMPTS: SuggestedPrompt[] = [
   { id: "signal-vs-plan", label: "Does /signal start the agent?", query: "Does the product signal start a Cursor SDK plan?" },
   { id: "who-merges", label: "Who is allowed to merge?", query: "Who is allowed to merge?" },
   { id: "grok-vs-sdk", label: "Grok or the SDK?", query: "Where does Grok run, and where does the Cursor SDK start?" },
+  { id: "sdk-facilitate", label: "How the SDK runs", query: "How does the Cursor SDK facilitate the workflow?" },
+  { id: "one-cursor-key", label: "One Cursor key?", query: "Does every engineer use their own Cursor key?" },
   { id: "liq-24", label: "Open LIQ-24 status", query: "What's the status of LIQ-24 and are there PRs?" },
 ];
