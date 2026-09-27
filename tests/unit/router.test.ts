@@ -77,6 +77,8 @@ describe("planRetrieval", () => {
       expect(planRetrieval(q, REPOS).intent, q).toBe("how_it_works");
     }
     expect(planRetrieval("How often has assistant-unit failed over the last 2 weeks?", REPOS).intent).toBe("ci_health");
+    expect(planRetrieval("How is the signal kick off the SDK workflow?", REPOS).intent).toBe("how_it_works");
+    expect(planRetrieval("How is the sginal kick off the SDK workflow?", REPOS).intent).toBe("how_it_works");
   });
 
   it("chooses overview style for summaries and direct style for specific questions", () => {

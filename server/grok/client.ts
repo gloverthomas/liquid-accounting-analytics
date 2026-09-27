@@ -22,7 +22,7 @@ export interface XaiClientOptions {
 
 const XAI_CHAT_URL = "https://api.x.ai/v1/chat/completions";
 const TEMPERATURE = 0.2;
-const MAX_TOKENS = 1_500;
+const MAX_TOKENS = 2_800;
 
 export function createXaiClient(options: XaiClientOptions): GrokClient {
   async function request(messages: GrokMessage[], jsonMode: boolean): Promise<string> {

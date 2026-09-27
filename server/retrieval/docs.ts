@@ -13,7 +13,7 @@ import { clip, redact } from "./redact.js";
 
 const GITHUB_API = "https://api.github.com";
 const SECTION_CHARS = 1_600;
-const MAX_DOC_ITEMS = 8;
+const MAX_DOC_ITEMS = 12;
 const WF = "gloverthomas/liquid-workflow";
 const INSIGHTS = "gloverthomas/liquid-accounting-analytics";
 const CORE = "gloverthomas/liquid-accounting-core";
@@ -261,7 +261,10 @@ const SYNONYMS: Record<string, string[]> = {
   deployed: ["vercel", "hosting"],
   hosted: ["tunnel", "hosting", "vercel"],
   privacy: ["pii", "posthog", "telemetry"],
-  signal: ["triage", "todo", "product"],
+  signal: ["triage", "todo", "product", "kickoff"],
+  kick: ["kickoff", "kicks", "trigger"],
+  kicks: ["kick", "kickoff", "trigger"],
+  kickoff: ["kick", "kicks", "trigger"],
   chat: ["assistant", "new"],
   bugbot: ["autofix", "review"],
   grok: ["xai", "assistant"],
@@ -278,7 +281,7 @@ const SYNONYMS: Record<string, string[]> = {
 };
 
 export function queryTokens(question: string): string[] {
-  const base = tokens(question);
+  const base = tokens(question.replace(/\bsginal\b/gi, "signal").replace(/\bgroq\b/gi, "grok"));
   return [...new Set([...base, ...base.flatMap((t) => SYNONYMS[t] ?? [])])];
 }
 

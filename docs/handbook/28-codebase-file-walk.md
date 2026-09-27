@@ -32,6 +32,51 @@ Open **Accounting-reporting** `server/productSignal.mjs`, symbol `handleProductS
 
 No. The product signal does not start a Cursor SDK plan. Open **liquid-workflow** `src/server.ts`, symbol `handleSignal`, then `src/linear-client.ts`, symbol `createProductSignalIssue`. `/signal` opens a Linear issue in **Todo**, assignee set, description containing the phrase **product signal**, and Slacks. It does not call `Agent.create`. You move that issue to **In Progress** to plan. Nothing is pre-created. A second page load can file again. A duplicate webhook delivery does not double-plan.
 
+## How the signal kick off starts the SDK workflow
+
+The signal does not kick off the SDK. The signal opens a Linear Todo. You kick off the SDK by moving that ticket to In Progress. Say that first, then walk these stages. PostHog and Sentry record the failure. They do not create the ticket and they do not call `Agent.create`.
+
+1. Reporting UI posts `/api/v1/product/signal` once per page load.
+2. `handleProductSignal` in Reporting forwards that body to the workflow.
+3. `handleSignal` creates the Todo and stops.
+4. You move the ticket to In Progress.
+5. The Linear webhook starts `startPlanRun` (`autoCreatePR: false`).
+6. `evaluateRun` scores the plan text. A fail means re-plan. A pass offers approval.
+7. You approve, then move to In Review. That starts `startImplementRun` (`autoCreatePR: true`).
+8. You merge on GitHub. The merge webhook moves the ticket to Done.
+
+## Signal kickoff step 1: Reporting posts the signal
+
+The product click is what kicks off the signal, not the SDK. On the planted New chat seam, `reportAssistantNewChatFailed` in **Accounting-reporting** `src/productSignal.ts` ran after a reply when New chat failed. It captured a PostHog event and a Sentry message, then `fetch` POSTed `/api/v1/product/signal` with hash `assistant-new-chat`, source `reporting:ai-assistant`, and the page URL. An empty thread did not file. That function is gone from `main` (Reporting PR 34). The same POST shape is still `reportAssistantRelatedQuestionsFailed` and `reportAssistantCalculationAccordionStuck`. The browser never holds the Linear key or `CURSOR_API_KEY`.
+
+## Signal kickoff step 2: Reporting forwards to the workflow
+
+**Accounting-reporting** `server/productSignal.mjs`, symbol `handleProductSignal`, receives the same-origin POST. It looks up the hash in `SEAMS` and forwards title plus detail to `WORKFLOW_SIGNAL_URL` (the Mac harness at `workflow.liquid-accounting.world`). If that forward cannot run and `LINEAR_API_KEY` is set on the Reporting server, the same file can create the Linear issue itself. The walkthrough path is the forward. The browser still does not talk to Linear.
+
+## Signal kickoff step 3: the workflow opens a Todo and stops
+
+**liquid-workflow** `src/server.ts`, symbol `handleSignal`. If `WORKFLOW_ENABLED` or `SIGNAL_ENABLED` is off, it returns 503 and nothing is filed. Otherwise `createProductSignalIssue` in `src/linear-client.ts` opens a **Todo**, assigns it, and writes a description that contains the exact phrase **product signal** plus the seam detail. It Slacks that a signal arrived. It does not call `startPlanRun`, `startImplementRun`, or `Agent.create`. This is triage. The SDK has not started.
+
+## Signal kickoff step 4: you move the ticket to In Progress
+
+This is the kick off of the SDK workflow. In Linear, move the new issue from Todo to **In Progress**. Nothing in Slack, PostHog, Sentry, or the product click does that move for you. Insights can propose a move only after you confirm (`server/actions/linearTransition.ts`, `proposeTransition`). The signal ticket is eligible without a new allowlist entry because `isWorkflowEligible` in `src/workflow-eligibility.ts` accepts the phrase **product signal** in the title or description.
+
+## Signal kickoff step 5: the webhook starts the plan
+
+Linear POSTs `/webhooks/linear` with a valid HMAC. `routeLinearWebhook` in `src/linear-webhook.ts` sees an Issue update into In Progress and returns action `plan`. `startPlanRun` in `src/sdk-planner.ts` calls `Agent.create` with `mode: "plan"` and `autoCreatePR: false`, so this run cannot open a PR. The prompt is `src/prompts/dynamic-ticket.ts`. The Linear description is the source of truth. `src/feature-map.ts` is only a hint. Specialists from `src/agents.ts` are read-only. Cursor Router picks the planner model (Intelligence). Composer is the fallback when the router is not entitled.
+
+## Signal kickoff step 6: the eval scores the plan
+
+`evaluateRun` in `src/eval/harness.ts` is a deterministic checklist over the plan text. It is not an MCP and not a model judge. Slack posts the result. If the eval fails, move the ticket back to **In Progress** to re-plan. **Approve implement** stays off. If it passes, Slack offers **Approve implement**. Approval records the write gate in `src/write-gate.ts` for 24 hours. Approval does not open the PR and does not start a second agent.
+
+## Signal kickoff step 7: In Review opens the PR
+
+After approval, you move the ticket to **In Review**. That state starts `startImplementRun`: `Agent.create` with `mode: "agent"` and `autoCreatePR: true`. The cloud agent opens the PR. The GitHub `pull_request` opened webhook calls `markIssueInReview` in `src/linear-in-review.ts`, which Slacks that the PR is open even if Linear was already In Review, and suppresses a second implement. Next you review BugBot, CI, and the preview. BugBot autofix commits onto that open PR. It does not open a second PR and it does not merge.
+
+## Signal kickoff step 8: you merge and the ticket is Done
+
+You merge on GitHub. Slack and the cloud agent do not merge. The merge webhook calls `markIssueDone` in `src/linear-done.ts` when `GITHUB_AUTO_DONE_ENABLED` is on. Linear moves to **Done** and Slack posts Done. That is the end of the kick off. A refresh of Reporting can file another signal and another Todo. A duplicate webhook delivery does not double-plan: `src/server.ts` skips a delivery id it has already processed and holds a per-issue lock.
+
 ## Why was a brand-new ticket eligible
 
 Open **liquid-workflow** `src/workflow-eligibility.ts`, symbol `isWorkflowEligible`. Plan and implement run when `TRIGGER_ISSUE_IDS` is empty, the identifier is in that list, or the title or description contains the exact phrase **product signal**. Signal tickets include that phrase, so they do not need a new allowlist entry. The harness does not change per bug. A Linear `/approve` comment that omits the description is looked up with `findIssueByIdentifier` so the phrase still counts.

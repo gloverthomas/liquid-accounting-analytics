@@ -65,6 +65,7 @@ export const ASK_CATALOG: AskTopic[] = [
       "What does BugBot do on an open PR?",
       "Where do credentials live for the workflow?",
       "Which models does the planner use, and who writes code?",
+      "How is the signal kick off the SDK workflow?",
     ],
   },
   {
