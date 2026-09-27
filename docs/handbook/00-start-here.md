@@ -24,7 +24,7 @@ All four repos are **public**. Never commit secrets, and never write unfixed sec
 
 ## Keeping Linear in sync
 
-Insights reads **Linear Documents** for this handbook. Pages **00–06** and repo **decision records** sync from GitHub automatically when you edit them here. Pages **07–21** (SDK/eval/PR stack + **interview prep 10–21**), workflow verbatim prompts, and prod-verified demo facts do **not** — update the matching Linear doc in the **same change** (see [documentation-sync.md](documentation-sync.md)).
+Insights reads **Linear Documents** for this handbook. Pages **00–06** and repo **decision records** sync from GitHub automatically when you edit them here. Pages **07–28** (SDK/eval/PR stack + **interview prep 10–28**), workflow verbatim prompts, and prod-verified demo facts do **not** — update the matching Linear doc in the **same change** (see [documentation-sync.md](documentation-sync.md)).
 
 ## Your first day
 
@@ -60,3 +60,4 @@ Insights reads **Linear Documents** for this handbook. Pages **00–06** and rep
 | [19 Interview: Session arc](19-interview-session-arc.md) | 45-minute timing |
 | [20 Interview: Q&A catalog](20-interview-qa-catalog.md) | Quick reference table |
 | [21 Interview: Two-repo story](21-interview-two-repo-convergence.md) | Convergence narrative |
+| [28 Codebase file walk](28-codebase-file-walk.md) | Which file to open, and the question to ask Insights |

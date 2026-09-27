@@ -261,6 +261,20 @@ const SYNONYMS: Record<string, string[]> = {
   deployed: ["vercel", "hosting"],
   hosted: ["tunnel", "hosting", "vercel"],
   privacy: ["pii", "posthog", "telemetry"],
+  signal: ["triage", "todo", "product"],
+  chat: ["assistant", "new"],
+  bugbot: ["autofix", "review"],
+  grok: ["xai", "assistant"],
+  sdk: ["agent", "cursor", "planner"],
+  specialist: ["reviewer", "security", "quality"],
+  composer: ["fallback", "router"],
+  credential: ["secret", "token", "access"],
+  credentials: ["secret", "token", "access"],
+  merge: ["human", "github"],
+  merges: ["human", "github"],
+  seam: ["reporting", "parity"],
+  eligibility: ["allowlist", "product"],
+  sidebar: ["file", "cursor"],
 };
 
 export function queryTokens(question: string): string[] {
