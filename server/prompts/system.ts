@@ -40,7 +40,7 @@ export const ANSWER_STYLES = {
 - The app draws the full timeline, so don't list every stage. Headline in **bold**: where the ticket is now. Then 2-4 bullets: what's done, what's blocking, and the exact next step (e.g. "approve the plan", "move to In Review", "merge PR #12").`,
   explain: `ANSWER STYLE: explain (a developer is onboarding or triaging).
 - Lead with a **bold one-sentence answer**.
-- When the sources describe a sequence (a kickoff, a signal, a webhook, a plan, an approval, an implement, a merge), write every stage as its own numbered step. One step per stage. Each step names the file or symbol from the sources and what happens there, including what does not happen. Do not collapse that sequence into a single bullet or a 3-bullet summary.
+- When the sources describe a sequence (a kickoff, a signal, a webhook, a plan, an approval, an implement, a merge, an Agent.create call, or an enterprise readiness list), write every stage or list item as its own numbered step. One step per stage. Each step names the file or symbol from the sources and what happens there, including what does not happen. Do not collapse that sequence into a single bullet or a 3-bullet summary.
 - After the sequence, add only the extra bullets the sources support, with **bold labels** chosen from: **Why**, **Where it lives**, **Gotchas**, **Security**.
 - Cite the doc sections and PRs you used. Only name files, env vars and commands that appear in the sources; never invent them.
 - Only include a **Why** bullet when a source states the reason; never invent rejected alternatives. If no source gives a reason, say "the reasoning isn't written down" and suggest adding a decision record in docs/decisions/.

@@ -181,6 +181,64 @@ The demo harness that was restarted for this walkthrough is **liquid-workflow** 
 
 Leave `.env.local` closed. Open `liquid-workflow/src/access.ts`. Say the values stay on the harness, the browser posts same-origin, and agents can open PRs but cannot merge.
 
+## How does the Cursor SDK facilitate the workflow
+
+How does the Cursor SDK facilitate the workflow? It facilitates the workflow only after you move a ticket. `Agent.create` in **liquid-workflow** `src/sdk-planner.ts` is the only SDK call. One `CURSOR_API_KEY` on the harness creates the cloud agent. An engineer does not facilitate this from their own IDE key. Say facilitating, not "the signal started the agent."
+
+1. `startPlanRun` calls `Agent.create` with `mode: "plan"` and `cloud.autoCreatePR: false`.
+2. `cloud.repos` clones Core and Reporting at `REPO_STARTING_REF` (default `main`).
+3. `agent.send` delivers the prompt. The harness reads `stream()` then `run.wait()`.
+4. `buildSpecialistAgents` attaches `security-reviewer` and `quality-reviewer`. The parent must spawn them. Their prompts say stay read-only.
+5. `evaluateRun` scores the plan text. A fail stops the loop. A pass waits for your approval.
+6. `startImplementRun` is a second `Agent.create` with `mode: "agent"` and `autoCreatePR: true`, after the write gate, a passing plan eval, and CI when `CI_GATE` is on.
+7. The agent opens the PR. You merge. The SDK does not merge and does not deploy.
+
+`DRY_RUN=true` skips `Agent.create` and writes a synthetic summary. The agent link is `https://cursor.com/agents/{agentId}`. In Cursor Agents, filter Source to SDK. Metadata is `liquid_issue`, `liquid_run`, and `workflow` (`convergence-planner` or `convergence-implement`).
+
+## One Cursor key calls Agent.create
+
+`startPlanRun` and `startImplementRun` both call `Agent.create` with `apiKey: config.cursorApiKey`. That value is `CURSOR_API_KEY` from the harness `.env.local` (`src/config.ts`). The same call sets `name` (`Liquid planner LIQ-N` or `Liquid implement LIQ-N`), `model` from `resolveRoleModel`, `mode`, `agents`, and `cloud`. Plan mode is `plan`. Implement mode is `agent`. There is no per-engineer key in this call. Insights, Core, Reporting, and the browser do not receive `CURSOR_API_KEY`. If the key is missing and `DRY_RUN` is false, the process fails closed on startup rather than running open.
+
+## The cloud sandbox clones both repos
+
+`Agent.create` `cloud.repos` is two entries: `CORE_REPO_URL` and `REPORTING_REPO_URL`, each with `startingRef` from `REPO_STARTING_REF` (default `main`). Defaults are the Core and Reporting GitHub URLs. The cloud agent clones both. It does not clone liquid-workflow or Insights. `autoCreatePR` is false on the plan call and true on the implement call, so only the second run may open a pull request. `cloud.metadata` records `liquid_issue`, `liquid_run`, `workflow`, and the model id. The harness stores `agent.agentId` and `https://cursor.com/agents/{agentId}`.
+
+## The harness sends the prompt and waits
+
+After `Agent.create`, `buildPlanPromptForIssue` picks the prompt. Heroes LIQ-24, LIQ-17, LIQ-16, LIQ-15, and LIQ-9 use `src/prompts/liq-*.ts`. Every other ticket, including a product-signal ticket, uses `src/prompts/dynamic-ticket.ts`. That prompt says the Linear description is the source of truth and injects `LIQUID_FEATURE_MAP` only as a hint. `agent.send(prompt)` returns a run. The harness collects `run.stream()` then `run.wait()`. If the text is empty, the summary becomes `Cloud agent {id} completed plan mode for {LIQ-N}.` That fallback names the id only, so eval content checks fail and you re-plan. Implement appends `HUMAN_WRITE_GATE` and `visualProofGate` again after the issue prompt.
+
+## Specialists are attached and stay read-only
+
+`buildSpecialistAgents` in `src/agents.ts` builds the `agents` map passed into `Agent.create`. `security-reviewer` uses the security model (Intelligence). `quality-reviewer` uses the quality model (Cost). The parent is not inside that map. Its model is the `model` field on `Agent.create` (planner Intelligence, implementer Balance). The parent prompt requires spawning both specialists before the plan is final or before PRs open. Each specialist prompt says PASS or FAIL, do not implement fixes, stay read-only. The prompt text still says LIQ-9 because that was the original example. On a signal ticket the parent scope is the Linear description. Specialists cannot merge.
+
+## Implement is a second Agent.create
+
+`startImplementRun` does not continue the plan agent. It checks gates, then calls `Agent.create` again. The write gate (`formalApprovalBlockReason`) must be clear unless bypassed. `EVAL_GATE` requires a passing plan eval. `CI_GATE` requires `main` CI green via `checkMainCiGreen`. Then the new agent uses `mode: "agent"`, the implementer model, the same two repos, and `autoCreatePR: true`. The name is `Liquid implement {LIQ-N}`. Metadata `workflow` is `convergence-implement`. The cloud agent opens the PR. `github.com/.../pull/N` URLs in the agent text become Slack buttons. Humans merge. This call does not deploy.
+
+## Does every engineer use their own Cursor key
+
+No. Every engineer does not use their own Cursor key. One `CURSOR_API_KEY` on the liquid-workflow harness calls `Agent.create`. Moving a Linear ticket to In Progress does not read anyone's IDE login. Insights does not hold the key. The browser does not hold the key. Core and Reporting do not hold the key. Spend and the cloud-agent identity belong to that one harness key. In Cursor Agents, filter Source to SDK to see those runs, separate from a person's IDE session. Putting a personal Cursor key in the product or in Insights is the model this workflow refuses.
+
+## What would we need to be enterprise ready
+
+What we would need to ensure this is enterprise ready starts with the key. Not everyone using their own Cursor key is already the design: one `CURSOR_API_KEY` on the harness calls `Agent.create`. The gaps are how that key is owned and where the process runs.
+
+1. Keep one team-owned Cursor key. Do not issue a personal IDE key per engineer. Today the key sits in the demo Mac `.env.local`. Enterprise would keep it in a vault, rotate it, and put spend limits on it. The code already reads only `CURSOR_API_KEY` from the harness process (`src/config.ts`).
+2. Run the harness on an always-on host. Decision 0005: the Cloudflare tunnel restarts itself; the Node process does not. Laptop sleep is a 502. A git pull does not update the running process until restart.
+3. The key's Cursor account must be allowed to open PRs on Core and Reporting. Enterprise would use a team account on those two repos, not an informal share of a personal login.
+4. Stop the public `POST /signal`. Decision 0006 leaves Cloudflare Access unconfigured because webhooks and the browser signal need exceptions. Enterprise would have the Reporting server sign the forward and refuse an anonymous post.
+
+The demo is already the centralized shape. It is not yet the operated service. Say this gap list. Do not say each engineer brings a Cursor key.
+
+## Enterprise ready: approval, audit, and what already holds
+
+The rest of what we would need to ensure this is enterprise ready, after the single Cursor key:
+
+5. Approval is still a demo list. Workflow approval is Slack **Approve implement**, a Linear `/approve` comment, or `POST /approve` with `APPROVE_TOKEN`. Insights Slack buttons are separate: only `SLACK_APPROVER_IDS` can press them, and they still confirm. Eligibility is `TRIGGER_ISSUE_IDS` or the phrase **product signal**. That is not per-team RBAC.
+6. Ship run records off the laptop. `runs/` keep 14 days (`RUN_RETENTION_DAYS`) and `src/pii.ts` scrubs tokens. Enterprise would keep that audit in central storage. Metadata already has `liquid_issue` and `liquid_run`.
+7. Lock model policy outside a laptop file. `CURSOR_MODEL_PLANNER`, `CURSOR_MODEL_SECURITY`, `CURSOR_MODEL_QUALITY`, and `CURSOR_MODEL_IMPLEMENTER` override the router. Set those on the host, not in an env someone can edit mid-demo.
+8. Keep what already matches an enterprise write policy: humans merge, branch protection, read-only specialists, eval and CI gates, HMAC webhooks, a bearer on `/trigger` and `/implement`, and no `CURSOR_API_KEY` in Insights or the browser.
+
 ## Sidebar roots
 
 - **Accounting-reporting** — the seam and the fix. On `main` before you start. `src/components/AiAssistant.tsx`, `src/productSignal.ts`, `server/productSignal.mjs`, `server/assistant.mjs`.

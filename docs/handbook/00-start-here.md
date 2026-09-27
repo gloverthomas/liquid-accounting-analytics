@@ -60,4 +60,4 @@ Insights reads **Linear Documents** for this handbook. Pages **00–06** and rep
 | [19 Interview: Session arc](19-interview-session-arc.md) | 45-minute timing |
 | [20 Interview: Q&A catalog](20-interview-qa-catalog.md) | Quick reference table |
 | [21 Interview: Two-repo story](21-interview-two-repo-convergence.md) | Convergence narrative |
-| [28 Codebase file walk](28-codebase-file-walk.md) | Which file to open, and the question to ask Insights |
+| [28 Codebase file walk](28-codebase-file-walk.md) | Which file to open, how the SDK runs, and what enterprise still needs |

@@ -75,6 +75,12 @@ const EXPLAIN = [
   /\b(grok or the sdk|grok versus|cursor sdk start|credentials live|kill switches)\b/i,
   /\bkick(?:s|ed|ing)?[- ]?off\b/i,
   /\bhow (is|does|do)\b[^.?]{0,120}\b(signal|\/signal)\b/i,
+  /\bfacilitat/i,
+  /\b(cursor )?sdk\b[^.?]{0,80}\b(workflow|facilitat)\b/i,
+  /\bagent\.create\b/i,
+  /\b(own|personal|their) (cursor )?(api )?key\b/i,
+  /\bcursor (api )?key\b/i,
+  /\benterprise\b/i,
 ];
 const NOT_EXPLAIN = /\bhow (many|often|much)\b|\btracking\b|\bthis week\b|\blast \d+ (days?|weeks?)\b/i;
 
