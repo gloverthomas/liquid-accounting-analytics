@@ -14,11 +14,12 @@ import type { Config } from "./config.js";
 import { fixtureAnswerFor } from "./fixtures/responses.js";
 import type { GrokClient, GrokMessage } from "./grok/client.js";
 import { parseGrokResponse, type ParsedGrokAnswer } from "./grok/parseResponse.js";
+import { diagramFromDocs, type FlowDiagram } from "../shared/flow.js";
 import { createReplyExtractor } from "./grok/replyStream.js";
 import { errorCode, logEvent } from "./log.js";
-import { ANSWER_STYLES, GROK_INSIGHTS_SYSTEM_PROMPT, REPAIR_INSTRUCTION } from "./prompts/system.js";
+import { ANSWER_STYLES, DIAGRAM_INSTRUCTION, GROK_INSIGHTS_SYSTEM_PROMPT, REPAIR_INSTRUCTION } from "./prompts/system.js";
 import { runRetrieval, type RetrievalDeps } from "./retrieval/index.js";
-import { normalizeQuestion, planRetrieval, type RetrievalPlan } from "./retrieval/router.js";
+import { isDiagramRequest, planRetrieval, questionForRetrieval, type RetrievalPlan } from "./retrieval/router.js";
 import type { RetrievedItem } from "./retrieval/types.js";
 
 export interface InsightAnswer {
@@ -30,6 +31,7 @@ export interface InsightAnswer {
   proposedAction?: ProposedAction;
   charts?: ChartSpec[];
   timeline?: PipelineTimeline;
+  diagram?: FlowDiagram;
 }
 
 export interface InsightDeps extends RetrievalDeps {
@@ -46,17 +48,28 @@ const WORKFLOW_INTENTS = new Set(["workflow_plan", "evals", "pipeline"]);
 const FALLBACK_CITATIONS = 3;
 const DEFAULT_FOLLOW_UPS = ["What's going on with LIQ-24?", "What merged on Reporting this week?", "Is assistant-unit passing on Core main?"];
 
+function diagramTitle(items: RetrievedItem[]): string {
+  const raw = items[0]?.citation.title ?? "How it fits together";
+  return raw.split("›").pop()?.trim() || raw;
+}
+
+function knowledgeDiagram(plan: RetrievalPlan, context: string, items: RetrievedItem[]): FlowDiagram | null {
+  if (plan.intent !== "how_it_works") return null;
+  return diagramFromDocs(context, diagramTitle(items));
+}
+
 function buildMessages(message: string, history: ChatTurn[], context: string, meta: RetrievalMeta, plan: RetrievalPlan): GrokMessage[] {
   const sampleNote = Object.entries(meta.connectorModes)
     .map(([connector, mode]) => `${connector}=${mode}`)
     .join(", ");
   const retrieval = context || "(no matching items were retrieved)";
+  const diagram = plan.intent === "how_it_works" || isDiagramRequest(message) ? `\n\n${DIAGRAM_INSTRUCTION}` : "";
   return [
     { role: "system", content: GROK_INSIGHTS_SYSTEM_PROMPT },
     ...history.map((turn) => ({ role: turn.role, content: turn.content })),
     {
       role: "user",
-      content: `RETRIEVAL (connectors: ${sampleNote}; window: ${meta.window}; truncated: ${meta.truncated})\n<<<\n${retrieval}\n>>>\n\n${ANSWER_STYLES[plan.style]}\n\nQUESTION: ${message}`,
+      content: `RETRIEVAL (connectors: ${sampleNote}; window: ${meta.window}; truncated: ${meta.truncated})\n<<<\n${retrieval}\n>>>\n\n${ANSWER_STYLES[plan.style]}${diagram}\n\nQUESTION: ${message}`,
     },
   ];
 }
@@ -133,7 +146,7 @@ export async function answerQuestion(message: string, history: ChatTurn[], confi
   const action = detectTicketAction(message);
   if (action) return proposeTransition(action, config, deps);
 
-  const asked = normalizeQuestion(message);
+  const asked = questionForRetrieval(message, history);
   const plan = planRetrieval(asked, config.github.repos);
   const workflowIntent = WORKFLOW_INTENTS.has(plan.intent);
   const workflow = workflowIntent ? await runWorkflowQuestion(plan, config, deps.fetch, (deps.now ?? Date.now)()) : null;
@@ -175,12 +188,14 @@ export async function answerQuestion(message: string, history: ChatTurn[], confi
       const knownIds = new Set(items.map((item) => item.citation.id));
       const parsed = await synthesize(deps.grok, buildMessages(message, history, context, meta, plan), knownIds, deps.onReplyDelta);
       if (parsed) {
+        const diagram = parsed.diagram ?? knowledgeDiagram(plan, context, items);
         return {
           reply: parsed.reply,
           citations: citationsFor(parsed.citationIds, items),
           relatedQuestions: parsed.relatedQuestions.length ? parsed.relatedQuestions : DEFAULT_FOLLOW_UPS,
           provider: `grok:${deps.grok.model}`,
           retrievalMeta: meta,
+          ...(diagram ? { diagram } : {}),
           ...chartPart,
         };
       }
@@ -188,8 +203,10 @@ export async function answerQuestion(message: string, history: ChatTurn[], confi
     } catch (error) {
       logEvent("grok_fallback", { requestId: deps.requestId, grok_error: errorCode(error) });
     }
-    return { ...(workflowNoData ?? fallbackAnswer(plan, items, meta, "failed")), retrievalMeta: meta, ...chartPart };
+    const diagram = knowledgeDiagram(plan, context, items);
+    return { ...(workflowNoData ?? fallbackAnswer(plan, items, meta, "failed")), retrievalMeta: meta, ...(diagram ? { diagram } : {}), ...chartPart };
   }
 
-  return { ...(workflowNoData ?? fallbackAnswer(plan, items, meta, deps.grok ? "failed" : "unconfigured")), retrievalMeta: meta, ...chartPart };
+  const diagram = knowledgeDiagram(plan, context, items);
+  return { ...(workflowNoData ?? fallbackAnswer(plan, items, meta, deps.grok ? "failed" : "unconfigured")), retrievalMeta: meta, ...(diagram ? { diagram } : {}), ...chartPart };
 }

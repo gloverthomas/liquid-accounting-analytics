@@ -110,6 +110,13 @@ export interface PipelineTimeline {
   steps: TimelineStep[];
 }
 
+/** A flow drawn beside a knowledge answer. Labels are short stage names, not counts. */
+export interface FlowDiagram {
+  title: string;
+  nodes: Array<{ id: string; label: string }>;
+  edges: Array<{ from: string; to: string }>;
+}
+
 export interface ChatResponse {
   requestId: string;
   reply: string;
@@ -121,6 +128,8 @@ export interface ChatResponse {
   proposedAction?: ProposedAction;
   charts?: ChartSpec[];
   timeline?: PipelineTimeline;
+  /** Mechanism flow for a how-it-works answer. Absent when the sources are not a sequence. */
+  diagram?: FlowDiagram;
 }
 
 export interface Organisation {

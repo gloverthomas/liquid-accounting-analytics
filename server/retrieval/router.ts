@@ -86,6 +86,25 @@ const EXPLAIN = [
   /\b(path|signal|sdk|workflow)\b[^.?]{0,40}\bin full\b/i,
 ];
 const NOT_EXPLAIN = /\bhow (many|often|much)\b|\btracking\b|\bthis week\b|\blast \d+ (days?|weeks?)\b/i;
+/** A picture of a mechanism. Quantitative "per day" asks stay on the chart path. */
+const QUANT_VIZ = /\b(per day|per week|how many|how much|breakdown|over time)\b/i;
+const DIAGRAM_REQUEST =
+  /\b(diagram|flowchart|flow-?chart)\b|\b(visuali[sz]e|draw|sketch)\b[^.?]{0,60}\b(flow|path|sequence|diagram|this|it|that)\b|\b(show|draw)\b[^.?]{0,40}\b(flow|diagram)\b/i;
+
+export function isDiagramRequest(message: string): boolean {
+  return DIAGRAM_REQUEST.test(message) && !QUANT_VIZ.test(message);
+}
+
+/** A follow-up like "visualise this" should retrieve the previous question's docs. */
+export function questionForRetrieval(message: string, history: Array<{ role: string; content: string }>): string {
+  const asked = normalizeQuestion(message);
+  if (!isDiagramRequest(asked)) return asked;
+  const prior = [...history].reverse().find((turn) => turn.role === "user" && turn.content.trim());
+  if (!prior) return asked;
+  const earlier = normalizeQuestion(prior.content);
+  if (earlier.toLowerCase() === asked.toLowerCase()) return asked;
+  return `${earlier}\n${asked}`;
+}
 
 const PIPELINE_WORDS = /\b(pipeline|timeline|journey|where is|how far (along|through)|progress of|stage|lifecycle)\b/i;
 
@@ -173,7 +192,7 @@ function extractKeywords(lower: string): string[] {
 function classify(message: string, hasIssueIds: boolean, namesStates: boolean): Intent {
   if (isInsightsUsageQuestion(message)) return "insights_usage";
   // Before the workflow intents: "how does the eval gate work?" is about the design, not today's numbers.
-  if (!hasIssueIds && !NOT_EXPLAIN.test(message) && EXPLAIN.some((re) => re.test(message))) return "how_it_works";
+  if (!hasIssueIds && !NOT_EXPLAIN.test(message) && (isDiagramRequest(message) || EXPLAIN.some((re) => re.test(message)))) return "how_it_works";
   if (WORKFLOW_PLAN.some((re) => re.test(message))) return "workflow_plan";
   if (EVAL_WORDS.test(message)) return "evals";
   if (hasIssueIds && PIPELINE_WORDS.test(message)) return "pipeline";

@@ -4,7 +4,8 @@
  * checklist, charts become one-line summaries with a link to the web app, and
  * action proposals become buttons with a confirm dialog.
  */
-import type { ChartSpec, Citation, PipelineTimeline, ProposedAction, TimelineStep } from "../../shared/contracts.js";
+import type { ChartSpec, Citation, FlowDiagram, PipelineTimeline, ProposedAction, TimelineStep } from "../../shared/contracts.js";
+import { flowLayers } from "../../shared/flow.js";
 import type { InsightAnswer } from "../insights.js";
 import { citationTokenRegex } from "../../shared/citations.js";
 
@@ -158,6 +159,13 @@ export function askedByBlock(user: string, question: string): unknown {
   return { type: "context", elements: [{ type: "mrkdwn", text: `<@${user}> asked: _${escape(clip(question, 280))}_` }] };
 }
 
+function diagramBlock(diagram: FlowDiagram): unknown {
+  const lines = flowLayers(diagram)
+    .map((row) => row.map((node) => node.label).join(" · "))
+    .join(" → ");
+  return { type: "section", text: { type: "mrkdwn", text: `*${escape(diagram.title)}*\n${escape(clip(lines, 500))}` } };
+}
+
 function badge(answer: InsightAnswer): string {
   if (answer.provider === "digest") return "Sources only";
   return Object.values(answer.retrievalMeta.connectorModes).includes("sample") ? "Sample data" : "Live data";
@@ -168,6 +176,7 @@ export function formatAnswer(answer: InsightAnswer, opts: SlackFormatOptions): S
   if (opts.askedBy) blocks.push(askedByBlock(opts.askedBy.user, opts.askedBy.question));
   blocks.push(...sections(toMrkdwn(answer.reply, answer.citations)));
   if (answer.timeline) blocks.push(...timelineBlocks(answer.timeline));
+  if (answer.diagram) blocks.push(diagramBlock(answer.diagram));
   if (answer.charts?.length) {
     const lines = answer.charts.map((c) => `📊 ${escape(chartSummary(c))}`);
     blocks.push({ type: "context", elements: [{ type: "mrkdwn", text: `${lines.join("\n")}\n<${opts.publicUrl}|See the charts in Liquid Insights>` }] });

@@ -331,6 +331,24 @@ a { color: inherit; }
 .chart-table th, .chart-table td { padding: 3px var(--space-3) 3px 0; text-align: left; }
 .chart-table thead th { color: var(--color-muted); font-weight: 500; }
 
+/* ─── Knowledge flow ───────────────────────────────────── */
+.flow { margin: var(--space-4) 0 var(--space-2); padding: var(--space-4); background: var(--color-surface); border: 1px solid var(--color-rule); border-radius: var(--radius-md); }
+.flow-layers { display: flex; flex-direction: column; margin: var(--space-4) 0 0; padding: 0; list-style: none; }
+.flow-layer { display: flex; flex-direction: column; align-items: center; }
+.flow-join { width: 2px; height: 16px; margin: 2px 0; background: var(--color-accent); position: relative; }
+.flow-join::after { content: ""; position: absolute; left: -4px; bottom: -1px; border: 5px solid transparent; border-top-color: var(--color-accent); }
+.flow-row { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-3); width: 100%; }
+.flow-node {
+  flex: 1 1 180px; max-width: 100%; display: flex; align-items: flex-start; gap: var(--space-2);
+  padding: 10px 12px; border: 1px solid var(--color-rule-strong); border-left: 3px solid var(--color-accent);
+  border-radius: var(--radius-md); background: var(--color-canvas); font-size: var(--text-sm); font-weight: 600;
+  line-height: 1.35; color: var(--color-ink); text-align: left;
+}
+.flow-index {
+  flex: 0 0 auto; display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%;
+  background: var(--color-accent); color: #fff; font-family: var(--font-mono); font-size: 10px; font-weight: 600;
+}
+
 /* ─── Pipeline tracker ─────────────────────────────────── */
 .pipeline { container-type: inline-size; margin: var(--space-4) 0 var(--space-2); padding: var(--space-4); background: var(--color-surface); border: 1px solid var(--color-rule); border-radius: var(--radius-md); }
 .pipeline-state { margin-left: var(--space-2); padding: 1px 8px; border-radius: var(--radius-pill); background: var(--status-neutral-wash); font-size: var(--text-xs); font-weight: 500; color: var(--color-text); }

@@ -110,4 +110,20 @@ describe("conversationStore", () => {
     const [bad] = parseConversations(JSON.stringify([withParts({ timeline: { ...timeline, steps: [{ key: "x", status: "exploded" }] } })]));
     expect(bad.entries[0].role === "assistant" && bad.entries[0].response.timeline).toBeUndefined();
   });
+
+  it("keeps a valid flow and drops a malformed one", () => {
+    const diagram = {
+      title: "Signal to SDK",
+      nodes: [
+        { id: "n1", label: "Reporting posts /signal" },
+        { id: "n2", label: "Workflow opens a Todo" },
+      ],
+      edges: [{ from: "n1", to: "n2" }],
+    };
+    const withParts = (extra: object) => conv("c", 1, { entries: [{ id: "a", role: "assistant", response: { ...chatResponse(), ...extra } as never }] });
+    const [good] = parseConversations(JSON.stringify([withParts({ diagram })]));
+    expect(good.entries[0].role === "assistant" && good.entries[0].response.diagram).toEqual(diagram);
+    const [bad] = parseConversations(JSON.stringify([withParts({ diagram: { title: "x", nodes: [{ id: "nope", label: "a" }] } })]));
+    expect(bad.entries[0].role === "assistant" && bad.entries[0].response.diagram).toBeUndefined();
+  });
 });

@@ -1,4 +1,5 @@
 import { citationTokenRegex } from "../../shared/citations.js";
+import { sanitizeFlow, type FlowDiagram } from "../../shared/flow.js";
 /**
  * Validates Grok's JSON and enforces the citation contract: only ids that were
  * actually retrieved survive, both in the citations list and inline in the reply.
@@ -8,6 +9,8 @@ export interface ParsedGrokAnswer {
   reply: string;
   citationIds: string[];
   relatedQuestions: string[];
+  /** Present only when the model returned a usable flow. */
+  diagram: FlowDiagram | null;
 }
 
 const MAX_REPLY_CHARS = 6_000;
@@ -71,5 +74,5 @@ export function parseGrokResponse(raw: string, knownIds: ReadonlySet<string>): P
     .slice(0, MAX_RELATED);
 
   // Footnote order = order of first appearance in the text; unreferenced sources follow.
-  return { reply, citationIds: [...new Set([...inlineIds, ...listed])], relatedQuestions };
+  return { reply, citationIds: [...new Set([...inlineIds, ...listed])], relatedQuestions, diagram: sanitizeFlow(record.diagram) };
 }
