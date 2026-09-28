@@ -4,7 +4,7 @@ import { flowLayers } from "../../shared/flow";
 /** A top-to-bottom mechanism flow. A straight sequence is one stage per row. */
 export function FlowDiagram({ diagram }: { diagram: Flow }) {
   const rows = flowLayers(diagram);
-  let step = 0;
+  const startAt = rows.map((_, index) => rows.slice(0, index).reduce((count, row) => count + row.length, 0));
   return (
     <figure className="flow" aria-label={diagram.title}>
       <figcaption className="chart-head">
@@ -16,17 +16,14 @@ export function FlowDiagram({ diagram }: { diagram: Flow }) {
           <li key={row.map((node) => node.id).join("-")} className="flow-layer">
             {index > 0 ? <span className="flow-join" aria-hidden="true" /> : null}
             <div className="flow-row">
-              {row.map((node) => {
-                step += 1;
-                return (
-                  <div key={node.id} className="flow-node">
-                    <span className="flow-index" aria-hidden="true">
-                      {step}
-                    </span>
-                    {node.label}
-                  </div>
-                );
-              })}
+              {row.map((node, nodeIndex) => (
+                <div key={node.id} className="flow-node">
+                  <span className="flow-index" aria-hidden="true">
+                    {startAt[index] + nodeIndex + 1}
+                  </span>
+                  {node.label}
+                </div>
+              ))}
             </div>
           </li>
         ))}
