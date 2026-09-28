@@ -66,6 +66,7 @@ export const ASK_CATALOG: AskTopic[] = [
       "Where do credentials live for the workflow?",
       "Which models does the planner use, and who writes code?",
       "How is the signal kick off the SDK workflow?",
+      "Walk the signal-to-SDK path in full",
       "How does the Cursor SDK facilitate the workflow?",
       "Does every engineer use their own Cursor key?",
       "What would we need to do to ensure this is ready for enterprise?",

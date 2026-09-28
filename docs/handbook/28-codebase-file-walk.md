@@ -32,6 +32,21 @@ Open **Accounting-reporting** `server/productSignal.mjs`, symbol `handleProductS
 
 No. The product signal does not start a Cursor SDK plan. Open **liquid-workflow** `src/server.ts`, symbol `handleSignal`, then `src/linear-client.ts`, symbol `createProductSignalIssue`. `/signal` opens a Linear issue in **Todo**, assignee set, description containing the phrase **product signal**, and Slacks. It does not call `Agent.create`. You move that issue to **In Progress** to plan. Nothing is pre-created. A second page load can file again. A duplicate webhook delivery does not double-plan.
 
+## Walk the signal to SDK path in full
+
+Walk the signal to SDK path in full. The signal does not start the SDK. It opens a Linear Todo. You start the SDK by moving that ticket to In Progress. This is the mechanism. It is not a recap of Done tickets or merged PRs.
+
+1. Reporting posts `/api/v1/product/signal` once per page load. The browser holds no `CURSOR_API_KEY`.
+2. `handleProductSignal` in **Accounting-reporting** `server/productSignal.mjs` forwards that post to the workflow.
+3. `handleSignal` in **liquid-workflow** `src/server.ts` creates the Todo with the phrase **product signal** and stops. It does not call `Agent.create`.
+4. You move the ticket to In Progress. That move is the SDK kickoff.
+5. The Linear webhook starts `startPlanRun`. `Agent.create` uses `mode: "plan"` and `autoCreatePR: false`. `src/prompts/dynamic-ticket.ts` treats the Linear description as the source of truth.
+6. `evaluateRun` scores the plan text. A fail means re-plan. Approve implement stays off.
+7. You approve, then move to In Review. `startImplementRun` is a second `Agent.create`, `mode: "agent"`, `autoCreatePR: true`. The cloud agent opens the PR.
+8. You merge on GitHub. The merge webhook moves the ticket to Done. Slack and the agent do not merge.
+
+PostHog and Sentry record the failure. They do not create the ticket and they do not call `Agent.create`.
+
 ## How the signal kick off starts the SDK workflow
 
 The signal does not kick off the SDK. The signal opens a Linear Todo. You kick off the SDK by moving that ticket to In Progress. Say that first, then walk these stages. PostHog and Sentry record the failure. They do not create the ticket and they do not call `Agent.create`.

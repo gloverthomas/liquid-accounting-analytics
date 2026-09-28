@@ -82,6 +82,8 @@ describe("planRetrieval", () => {
     expect(planRetrieval("How does the Cursor SDK facilitate the workflow?", REPOS).intent).toBe("how_it_works");
     expect(planRetrieval("Does every engineer use their own Cursor key?", REPOS).intent).toBe("how_it_works");
     expect(planRetrieval("What would we need to do to ensure this is ready for enterprise?", REPOS).intent).toBe("how_it_works");
+    expect(planRetrieval("Walk the signal-to-SDK path in full", REPOS).intent).toBe("how_it_works");
+    expect(planRetrieval("Walk the signal-to-SDK path in full", REPOS).style).toBe("explain");
   });
 
   it("chooses overview style for summaries and direct style for specific questions", () => {

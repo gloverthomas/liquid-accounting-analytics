@@ -281,7 +281,9 @@ const SYNONYMS: Record<string, string[]> = {
 };
 
 export function queryTokens(question: string): string[] {
-  const base = tokens(question.replace(/\bsginal\b/gi, "signal").replace(/\bgroq\b/gi, "grok"));
+  const base = tokens(
+    question.replace(/\bsginal\b/gi, "signal").replace(/\bgroq\b/gi, "grok").replace(/\bsignal[- ]to[- ]sdk\b/gi, "signal to sdk"),
+  );
   return [...new Set([...base, ...base.flatMap((t) => SYNONYMS[t] ?? [])])];
 }
 
