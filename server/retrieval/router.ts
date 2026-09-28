@@ -81,6 +81,9 @@ const EXPLAIN = [
   /\b(own|personal|their) (cursor )?(api )?key\b/i,
   /\bcursor (api )?key\b/i,
   /\benterprise\b/i,
+  /\bwalk\b[^.?]{0,100}\b(path|signal|sdk|workflow|kickoff|kick[- ]off)\b/i,
+  /\bsignal[- ]to[- ]sdk\b/i,
+  /\b(path|signal|sdk|workflow)\b[^.?]{0,40}\bin full\b/i,
 ];
 const NOT_EXPLAIN = /\bhow (many|often|much)\b|\btracking\b|\bthis week\b|\blast \d+ (days?|weeks?)\b/i;
 
@@ -187,7 +190,10 @@ function classify(message: string, hasIssueIds: boolean, namesStates: boolean): 
 
 /** Live questions often misspell the two product names. Retrieval should still hit the handbook. */
 export function normalizeQuestion(message: string): string {
-  return message.replace(/\bsginal\b/gi, "signal").replace(/\bgroq\b/gi, "Grok");
+  return message
+    .replace(/\bsginal\b/gi, "signal")
+    .replace(/\bgroq\b/gi, "Grok")
+    .replace(/\bsignal[- ]to[- ]sdk\b/gi, "signal to SDK");
 }
 
 export function planRetrieval(message: string, configuredRepos: string[]): RetrievalPlan {

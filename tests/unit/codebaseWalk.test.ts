@@ -34,6 +34,7 @@ describe("codebase file walk ranking", () => {
       ["Which models does the planner use, and who writes code?", "Which models and who writes code"],
       ["How is the signal kick off the SDK workflow?", "How the signal kick off starts the SDK workflow"],
       ["How is the sginal kick off the SDK workflow?", "How the signal kick off starts the SDK workflow"],
+      ["Walk the signal-to-SDK path in full", "Walk the signal to SDK path in full"],
       ["How does the Cursor SDK facilitate the workflow?", "How does the Cursor SDK facilitate the workflow"],
       ["Does every engineer use their own Cursor key?", "Does every engineer use their own Cursor key"],
       ["What would we need to do to ensure this is ready for enterprise?", "What would we need to be enterprise ready"],
