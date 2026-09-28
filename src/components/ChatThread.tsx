@@ -6,6 +6,7 @@ import { ActionProposal } from "./ActionProposal";
 import { tidyStreaming } from "../lib/markdown";
 import { AnswerMarkdown } from "./AnswerMarkdown";
 import { Chart } from "./Chart";
+import { FlowDiagram } from "./FlowDiagram";
 import { PipelineTimeline } from "./PipelineTimeline";
 import { CitationList } from "./CitationList";
 import { PromptPills } from "./PromptPills";
@@ -62,6 +63,7 @@ function AssistantCard({ entryId, response, onAsk, disabled, isLatest, onConfirm
       </header>
       <AnswerMarkdown text={response.reply} citationIndex={citationIndex} anchorPrefix={anchorPrefix} />
       {response.timeline ? <PipelineTimeline timeline={response.timeline} /> : null}
+      {response.diagram ? <FlowDiagram diagram={response.diagram} /> : null}
       {response.charts?.map((chart) => <Chart key={chart.id} chart={chart} />)}
       {response.proposedAction && isLatest ? (
         <ActionProposal

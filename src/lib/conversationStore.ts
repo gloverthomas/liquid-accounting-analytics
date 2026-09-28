@@ -5,6 +5,7 @@
  * dropped on load, and answers still render through the safe markdown path.
  */
 import type { ChartSpec, ChatResponse } from "../../shared/contracts";
+import { sanitizeFlow } from "../../shared/flow";
 import { sanitizeChart } from "./chart";
 
 export type StoredEntry = { id: string; role: "user"; content: string } | { id: string; role: "assistant"; response: ChatResponse };
@@ -60,15 +61,17 @@ function isTimeline(v: unknown): boolean {
   );
 }
 
-/** Keeps valid proposals/charts/timelines; drops malformed ones (the server re-validates tokens anyway). */
+/** Keeps valid proposals/charts/timelines/flows; drops malformed ones (the server re-validates tokens anyway). */
 function sanitizeResponse(response: ChatResponse): ChatResponse {
-  const { proposedAction, charts, timeline, ...rest } = response;
+  const { proposedAction, charts, timeline, diagram, ...rest } = response;
   const cleanCharts = Array.isArray(charts) ? charts.map(sanitizeChart).filter((c): c is ChartSpec => c !== null) : [];
+  const cleanDiagram = sanitizeFlow(diagram);
   return {
     ...rest,
     ...(proposedAction !== undefined && isProposal(proposedAction) ? { proposedAction } : {}),
     ...(cleanCharts.length ? { charts: cleanCharts } : {}),
     ...(timeline !== undefined && isTimeline(timeline) ? { timeline } : {}),
+    ...(cleanDiagram ? { diagram: cleanDiagram } : {}),
   };
 }
 

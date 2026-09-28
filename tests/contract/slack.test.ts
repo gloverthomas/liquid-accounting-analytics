@@ -126,6 +126,19 @@ describe("formatAnswer", () => {
     expect(JSON.stringify(blocks)).toContain("no Slack approvers are set up");
   });
 
+  it("draws a knowledge flow as a single path line", () => {
+    const diagram = {
+      title: "Signal to SDK",
+      nodes: [
+        { id: "n1", label: "Reporting posts /signal" },
+        { id: "n2", label: "Workflow opens a Todo" },
+      ],
+      edges: [{ from: "n1", to: "n2" }],
+    };
+    const { blocks } = formatAnswer({ ...baseAnswer, diagram }, { publicUrl: "https://insights.liquid-accounting.world", actionsEnabled: false });
+    expect(JSON.stringify(blocks)).toContain("Reporting posts /signal → Workflow opens a Todo");
+  });
+
   it("summarises column charts by series totals", () => {
     expect(chartSummary({ ...baseAnswer.charts![0], kind: "stacked", series: [{ key: "p", name: "Passed", color: "good", values: [1, 2] }] })).toBe("Most-failed eval checks: Passed 3 failures");
   });

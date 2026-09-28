@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { planRetrieval } from "../../server/retrieval/router.js";
+import { isDiagramRequest, planRetrieval, questionForRetrieval } from "../../server/retrieval/router.js";
 
 const REPOS = ["gloverthomas/liquid-accounting-core", "gloverthomas/liquid-accounting-reporting"];
 
@@ -84,6 +84,22 @@ describe("planRetrieval", () => {
     expect(planRetrieval("What would we need to do to ensure this is ready for enterprise?", REPOS).intent).toBe("how_it_works");
     expect(planRetrieval("Walk the signal-to-SDK path in full", REPOS).intent).toBe("how_it_works");
     expect(planRetrieval("Walk the signal-to-SDK path in full", REPOS).style).toBe("explain");
+    expect(planRetrieval("Can you visualise this with a diagram?", REPOS).intent).toBe("how_it_works");
+    expect(planRetrieval("Can you visualise this with a diagram?", REPOS).style).toBe("explain");
+    expect(planRetrieval("Can you visualise this with a diagram?", REPOS).charts).toEqual([]);
+    expect(planRetrieval("Walk the signal-to-SDK path and visualise it with a diagram", REPOS).intent).toBe("how_it_works");
+    expect(planRetrieval("Visualise merged PRs per day", REPOS).intent).not.toBe("how_it_works");
+    expect(isDiagramRequest("Can you visualise this with a diagram?")).toBe(true);
+    expect(isDiagramRequest("Visualise merged PRs per day")).toBe(false);
+  });
+
+  it("retrieves the previous question when a follow-up asks for a diagram", () => {
+    const history = [{ role: "user", content: "Walk the signal-to-SDK path in full" }, { role: "assistant", content: "Eight steps." }];
+    expect(questionForRetrieval("Can you visualise this with a diagram?", history)).toBe(
+      "Walk the signal to SDK path in full\nCan you visualise this with a diagram?",
+    );
+    expect(questionForRetrieval("Can you visualise this with a diagram?", [])).toBe("Can you visualise this with a diagram?");
+    expect(planRetrieval(questionForRetrieval("Can you visualise this with a diagram?", history), REPOS).intent).toBe("how_it_works");
   });
 
   it("chooses overview style for summaries and direct style for specific questions", () => {

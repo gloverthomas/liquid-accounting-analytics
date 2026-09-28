@@ -21,9 +21,10 @@ Rules:
 13. If the question asks about something RETRIEVAL marks NOT TRACKED, your headline must say it can't be measured yet. You may then offer the closest available data, clearly labelled as something else, never as the thing asked about.
 
 Output ONLY a JSON object (no markdown fences, no prose around it) with exactly this shape:
-{"reply":"markdown answer with inline [id] citations","citations":["id", "..."],"relatedQuestions":["follow-up 1","follow-up 2","follow-up 3"]}
+{"reply":"markdown answer with inline [id] citations","citations":["id", "..."],"relatedQuestions":["follow-up 1","follow-up 2","follow-up 3"],"diagram":null}
 - "citations": every RETRIEVAL id you relied on, most important first.
-- "relatedQuestions": exactly 3 short follow-ups answerable from Linear/GitHub/CI.`;
+- "relatedQuestions": exactly 3 short follow-ups answerable from Linear/GitHub/CI.
+- "diagram": null unless a DIAGRAM instruction in the user message asks for a flow. Never put a diagram, mermaid, or code fence inside "reply".`;
 
 /** Per-question answer shape, chosen by the router and sent with the question. */
 export const ANSWER_STYLES = {
@@ -48,10 +49,15 @@ export const ANSWER_STYLES = {
 - Cite inline only; don't add a "Citations" or "Sources" bullet (the app lists sources).
 - Prefer DECISION RECORD sections and design comments over README text when they disagree; they're more deliberate and more recent.
 - Follow any SECURITY IN FLIGHT note exactly.
-- relatedQuestions: 3 natural next questions a new developer would ask about this area, including how the code works. They do not have to be ticket or CI questions.`,
+- relatedQuestions: 3 natural next questions a new developer would ask about this area, including how the code works. They do not have to be ticket or CI questions. When the answer has no diagram, one of them may be "Can you visualise this with a diagram?".`,
   direct: `ANSWER STYLE: direct.
 - Lead with a one-sentence answer in **bold**, then 1-5 short bullets with **bold labels** and citations.`,
 } as const;
+
+/** Appended when the question asks for a picture, or the answer is a how-it-works sequence. */
+export const DIAGRAM_INSTRUCTION = `DIAGRAM: Set "diagram" to a flow of the mechanism in the sources.
+{"title":"short title","nodes":[{"id":"n1","label":"Reporting posts /signal"},{"id":"n2","label":"Workflow opens a Todo"}],"edges":[{"from":"n1","to":"n2"}]}
+Use 3 to 10 nodes, ids n1, n2, n3 in order. One node per stage. Labels are short phrases copied from the sources, never ticket counts or "the path is closed". Edges link each stage to the next. If the sources are not a sequence, set "diagram" to null. Do not draw the diagram inside "reply".`;
 
 export const REPAIR_INSTRUCTION =
   'Your previous output was not valid JSON in the required shape (it may have been cut off for length). Reply again with ONLY the JSON object {"reply":"...","citations":["..."],"relatedQuestions":["...","...","..."]}, keeping "reply" under 200 words and at most 6 bullets.';

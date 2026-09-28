@@ -15,7 +15,33 @@ describe("parseGrokResponse", () => {
       reply: "**LIQ-24 is In Progress** [linear:LIQ-24]",
       citationIds: ["linear:LIQ-24"],
       relatedQuestions: ["a", "b", "c"],
+      diagram: null,
     });
+  });
+
+  it("keeps a usable flow and drops a malformed one without failing the answer", () => {
+    const good = JSON.stringify({
+      reply: "The signal opens a ticket, then a human starts the plan.",
+      diagram: {
+        title: "Signal to SDK",
+        nodes: [
+          { id: "n1", label: "Reporting posts /signal" },
+          { id: "N2", label: "`Workflow` opens a Todo" },
+        ],
+        edges: [{ from: "n1", to: "n2" }],
+      },
+    });
+    expect(parseGrokResponse(good, known)?.diagram).toEqual({
+      title: "Signal to SDK",
+      nodes: [
+        { id: "n1", label: "Reporting posts /signal" },
+        { id: "n2", label: "Workflow opens a Todo" },
+      ],
+      edges: [{ from: "n1", to: "n2" }],
+    });
+    const bad = JSON.stringify({ reply: "Still an answer.", diagram: { title: "Broken", nodes: [{ id: "n1", label: "only one" }] } });
+    expect(parseGrokResponse(bad, known)?.diagram).toBeNull();
+    expect(parseGrokResponse(bad, known)?.reply).toBe("Still an answer.");
   });
 
   it("strips markdown fences", () => {

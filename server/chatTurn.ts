@@ -9,7 +9,7 @@ import type { Config } from "./config.js";
 import type { GrokClient } from "./grok/client.js";
 import { answerQuestion } from "./insights.js";
 import { logEvent } from "./log.js";
-import { planRetrieval } from "./retrieval/router.js";
+import { planRetrieval, questionForRetrieval } from "./retrieval/router.js";
 import type { FetchLike } from "./retrieval/types.js";
 import { recordQuestion, type QuestionChannel, type QuestionRecord } from "./telemetry.js";
 
@@ -47,7 +47,7 @@ export async function runChatTurn(input: ChatTurnInput, deps: ChatTurnDeps): Pro
   const started = now();
   const action = detectTicketAction(message);
   const help = isHelpQuestion(message);
-  const plan = planRetrieval(message, config.github.repos);
+  const plan = planRetrieval(questionForRetrieval(message, history), config.github.repos);
   const record = (answer: Omit<QuestionRecord, "topic" | "style" | "charts" | "windowDays" | "channel">): Promise<void> =>
     recordQuestion(config, fetch, viewerId, {
       topic: action ? "ticket_move" : help ? "help" : plan.intent,

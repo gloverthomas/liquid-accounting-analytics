@@ -67,6 +67,7 @@ export const ASK_CATALOG: AskTopic[] = [
       "Which models does the planner use, and who writes code?",
       "How is the signal kick off the SDK workflow?",
       "Walk the signal-to-SDK path in full",
+      "Can you visualise this with a diagram?",
       "How does the Cursor SDK facilitate the workflow?",
       "Does every engineer use their own Cursor key?",
       "What would we need to do to ensure this is ready for enterprise?",
