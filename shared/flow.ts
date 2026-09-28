@@ -66,16 +66,10 @@ export function sanitizeFlow(value: unknown): FlowDiagram | null {
   return { title, nodes, edges };
 }
 
-/** First numbered sequence of at least three steps, in the order the docs were ranked. */
+/** First numbered sequence of at least three steps. Docs context is often one flattened line. */
 export function diagramFromDocs(context: string, title: string): FlowDiagram | null {
   const steps: string[] = [];
-  for (const line of context.split("\n")) {
-    const match = line.match(/^\s*(\d+)\.\s+(.+)$/);
-    if (!match) {
-      if (steps.length >= 3) break;
-      steps.length = 0;
-      continue;
-    }
+  for (const match of context.matchAll(/(?:^|\s)(\d+)\.\s+([\s\S]*?)(?=\s\d+\.\s+|$)/g)) {
     const n = Number(match[1]);
     if (n !== steps.length + 1) {
       if (steps.length >= 3) break;

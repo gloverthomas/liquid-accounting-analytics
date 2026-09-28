@@ -214,6 +214,53 @@ describe("how-it-works answers", () => {
     expect(queryTokens("How is the workflow API secured?")).toEqual(expect.arrayContaining(["workflow", "api", "secured", "security", "token", "auth", "access", "control", "plane"]));
   });
 
+  it("draws a flow from the docs when the model omits one, and keeps a model flow when it is valid", async () => {
+    const body = `# Write policy
+
+## Human path
+
+How the human write gate works, as a sequence.
+
+1. Reporting posts the signal
+2. Workflow opens a Todo
+3. A human moves it to In Progress
+`;
+    const fetch = mockFetch((url) => {
+      const path = new URL(url).pathname;
+      if (url.includes("/search/issues")) return jsonResponse({ items: [] });
+      if (path.endsWith("/liquid-workflow/contents/WRITE-POLICY.md")) return new Response(body);
+      if (url.startsWith("https://api.linear.app/graphql")) return jsonResponse({ data: { documents: { nodes: [] } } });
+      return new Response("not found", { status: 404 });
+    });
+    const config = makeConfig({ GITHUB_TOKEN: "gh", LINEAR_API_KEY: "lin" });
+    const omitted = fakeGrok(JSON.stringify({ reply: "**A human starts the plan.**", citations: [], relatedQuestions: ["Can you visualise this with a diagram?"] }));
+    const fromDocs = await answerQuestion("How does the human write gate work?", [], config, { fetch, grok: omitted, channel: "web", cache: new TtlCache() });
+    expect(omitted.calls[0].at(-1)!.content).toContain("DIAGRAM:");
+    expect(fromDocs.diagram?.nodes.map((node) => node.label)).toEqual([
+      "Reporting posts the signal",
+      "Workflow opens a Todo",
+      "A human moves it to In Progress",
+    ]);
+
+    const modelFlow = {
+      title: "Write gate",
+      nodes: [
+        { id: "n1", label: "Plan" },
+        { id: "n2", label: "Approve" },
+      ],
+      edges: [{ from: "n1", to: "n2" }],
+    };
+    const supplied = fakeGrok(JSON.stringify({ reply: "**Approve, then implement.**", citations: [], diagram: modelFlow }));
+    const fromModel = await answerQuestion("Can you visualise this with a diagram?", [{ role: "user", content: "How does the human write gate work?" }], config, {
+      fetch,
+      grok: supplied,
+      channel: "web",
+      cache: new TtlCache(),
+    });
+    expect(fromModel.diagram).toEqual(modelFlow);
+    expect(supplied.calls[0].map((message) => message.content).join("\n")).toContain("How does the human write gate work?");
+  });
+
   it("says so when no docs match", async () => {
     const { fetch } = fakeSources();
     const answer = await answerQuestion("How does the quantum flux capacitor work?", [], makeConfig({ GITHUB_TOKEN: "gh" }), { fetch, grok: fakeGrok("{}") });

@@ -47,6 +47,12 @@ describe("diagramFromDocs", () => {
       { from: "n3", to: "n4" },
     ]);
     expect(diagramFromDocs("1. only\n2. two steps", "Short")).toBeNull();
+    const flat = "How the write gate works. 1. Reporting posts the signal 2. Workflow opens a Todo 3. A human moves it to In Progress";
+    expect(diagramFromDocs(flat, "Write gate")?.nodes.map((node) => node.label)).toEqual([
+      "Reporting posts the signal",
+      "Workflow opens a Todo",
+      "A human moves it to In Progress",
+    ]);
   });
 });
 
